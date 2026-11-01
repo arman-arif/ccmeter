@@ -24,7 +24,12 @@ Usage:
   ccmeter json                   same data as JSON
   ccmeter serve [-addr ADDR]     web dashboard (default 127.0.0.1:7878);
                                  -read-only turns off account editing
-  ccmeter statusline             one-line meter for Claude Code's status line
+  ccmeter statusline             one-line meter for Claude Code's status line;
+                                 also records the real plan limits it reports
+  ccmeter statusline install [NAME...] [--force]
+                                 set ccmeter as the status line of every (or
+                                 the named) account, to collect plan limits
+  ccmeter statusline uninstall [NAME...]
   ccmeter init [--force]         write a config file with detected accounts
   ccmeter accounts               list accounts and where the config lives
   ccmeter add NAME DIR [flags]   add an account (any path; --block-limit,
@@ -176,6 +181,12 @@ func main() {
 			fail(err)
 		}
 	case "statusline":
+		if len(rest) > 0 && (rest[0] == "install" || rest[0] == "uninstall") {
+			if err := cmdStatuslineSetup(cfgPath, rest[0], rest[1:]); err != nil {
+				fail(err)
+			}
+			return
+		}
 		runStatusline(cfg, pr)
 	default:
 		fmt.Fprintf(os.Stderr, "unknown command %q\n\n%s", cmd, usage)
@@ -264,8 +275,18 @@ func printTable(r Report, verbose, none bool) {
 			fmt.Fprintf(w, "%s\tnot found: %s\t\t\t\n", s.Name, s.Dir)
 			continue
 		}
-		fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n", s.Name, blockCell(s.Block),
-			periodCell(s.Today), periodCell(s.Week), periodCell(s.Month))
+		five, week := blockCell(s.Block), periodCell(s.Week)
+		if pw := planWindow(s.Plan, true); pw != nil {
+			five = "plan " + planCell(pw)
+			if s.Block.Active {
+				five += ", " + fmtUSD(s.Block.CostUSD) + " est"
+			}
+		}
+		if pw := planWindow(s.Plan, false); pw != nil {
+			week += ", plan " + planCell(pw)
+		}
+		fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n", s.Name, five,
+			periodCell(s.Today), week, periodCell(s.Month))
 	}
 	if len(r.Accounts) > 1 {
 		fmt.Fprintf(w, "ALL\t\t%s\t%s\t%s\n",
@@ -300,5 +321,18 @@ func printTable(r Report, verbose, none bool) {
 				s.Name, strings.Join(s.Unpriced, ", "))
 		}
 	}
+	var seen []string
+	for _, s := range r.Accounts {
+		if s.Plan != nil {
+			seen = append(seen, s.Name+" "+fmtDur(s.Plan.AgeMin)+" ago")
+		}
+	}
+	plan := len(seen) > 0
+	if plan {
+		fmt.Println("\nPlan limits as last reported by Claude Code: " + strings.Join(seen, ", "))
+	}
 	fmt.Println("\nCosts are estimates at API list prices; % is of your limit, or of your own 30-day peak window.")
+	if !plan {
+		fmt.Println("Run `ccmeter statusline install` to also show the real plan limits Claude Code reports.")
+	}
 }

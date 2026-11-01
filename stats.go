@@ -59,19 +59,20 @@ type ModelRow struct {
 }
 
 type Summary struct {
-	Name         string     `json:"name"`
-	Dir          string     `json:"dir"`
-	Found        bool       `json:"found"`
-	Error        string     `json:"error,omitempty"`
-	Files        int        `json:"files"`
-	LastActivity *time.Time `json:"last_activity,omitempty"`
-	Block        Block      `json:"block"`
-	Today        Period     `json:"today"`
-	Week         Period     `json:"week"`  // rolling 7 days
-	Month        Period     `json:"month"` // rolling 30 days
-	Daily        []DayPoint `json:"daily"` // last 30 days, oldest first
-	Models       []ModelRow `json:"models"`
-	Unpriced     []string   `json:"unpriced,omitempty"`
+	Name         string      `json:"name"`
+	Dir          string      `json:"dir"`
+	Found        bool        `json:"found"`
+	Error        string      `json:"error,omitempty"`
+	Files        int         `json:"files"`
+	LastActivity *time.Time  `json:"last_activity,omitempty"`
+	Block        Block       `json:"block"`
+	Today        Period      `json:"today"`
+	Week         Period      `json:"week"`  // rolling 7 days
+	Month        Period      `json:"month"` // rolling 30 days
+	Daily        []DayPoint  `json:"daily"` // last 30 days, oldest first
+	Models       []ModelRow  `json:"models"`
+	Unpriced     []string    `json:"unpriced,omitempty"`
+	Plan         *PlanLimits `json:"plan,omitempty"` // real limits reported by Claude Code
 }
 
 type Report struct {
@@ -115,6 +116,7 @@ func splitBlocks(es []Entry, costs []float64) []blockSpan {
 func summarize(a *Account, pr *Pricer, now time.Time) Summary {
 	cfg, es, found, errStr, files := a.snapshot()
 	s := Summary{Name: cfg.Name, Dir: cfg.Dir, Found: found, Error: errStr, Files: files}
+	s.Plan = loadLimits(cfg.Dir, now)
 	sort.Slice(es, func(i, j int) bool { return es[i].T.Before(es[j].T) })
 
 	local := now.Local()

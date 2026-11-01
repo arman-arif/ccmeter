@@ -16,6 +16,7 @@ type statusInput struct {
 	Model          struct {
 		DisplayName string `json:"display_name"`
 	} `json:"model"`
+	RateLimits *rawRateLimits `json:"rate_limits"`
 }
 
 // runStatusline prints one line for the account the current session belongs to.
@@ -30,6 +31,7 @@ func runStatusline(cfg Config, pr *Pricer) {
 	}
 
 	acct := pickAccount(cfg, in.TranscriptPath)
+	_ = saveLimits(acct.Dir, in.RateLimits, time.Now())
 	a := newAccount(acct)
 	cutoff := time.Now().Add(-8 * 24 * time.Hour) // enough for today, 5h and 7 days
 	a.Scan(cutoff)
@@ -39,12 +41,45 @@ func runStatusline(cfg Config, pr *Pricer) {
 	if in.Model.DisplayName != "" {
 		parts = append(parts, in.Model.DisplayName)
 	}
-	parts = append(parts, "5h: "+blockCell(s.Block))
-	parts = append(parts, "today "+fmtUSD(s.Today.CostUSD))
-	if s.Week.LimitUSD > 0 {
+	if w := planWindow(s.Plan, true); w != nil {
+		parts = append(parts, "5h "+planCell(w))
+	} else {
+		parts = append(parts, "5h: "+blockCell(s.Block))
+	}
+	if w := planWindow(s.Plan, false); w != nil {
+		parts = append(parts, "week "+planCell(w))
+	} else if s.Week.LimitUSD > 0 {
 		parts = append(parts, fmt.Sprintf("week %.0f%%", s.Week.Pct))
 	}
+	parts = append(parts, "today "+fmtUSD(s.Today.CostUSD))
 	fmt.Println(strings.Join(parts, " · "))
+}
+
+func planWindow(p *PlanLimits, fiveHour bool) *LimitWindow {
+	if p == nil {
+		return nil
+	}
+	if fiveHour {
+		return p.FiveHour
+	}
+	return p.SevenDay
+}
+
+// planCell formats a plan window: "42% (resets 14:00)".
+func planCell(w *LimitWindow) string {
+	if w.Reset {
+		return "reset"
+	}
+	s := fmt.Sprintf("%.0f%%", w.UsedPct)
+	if !w.ResetsAt.IsZero() {
+		left := time.Until(w.ResetsAt)
+		if left < 24*time.Hour {
+			s += " (" + fmtDur(int(left.Minutes())) + " left)"
+		} else {
+			s += " (resets " + w.ResetsAt.Local().Format("Mon 15:04") + ")"
+		}
+	}
+	return s
 }
 
 // pickAccount decides which account a session belongs to: CLAUDE_CONFIG_DIR
