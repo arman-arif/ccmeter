@@ -139,6 +139,22 @@
   code { font: 12px ui-monospace, SFMono-Regular, Menlo, monospace; background: var(--surface-0);
          padding: 1px 5px; border-radius: 4px; }
   footer { margin-top: 24px; color: var(--text-muted); font-size: 12px; }
+  .plan { border: 1px solid var(--border); border-radius: 10px; padding: 12px; margin-bottom: 14px; }
+  .plan + .plan { margin-top: -6px; }
+  .plan-row { display: flex; align-items: baseline; gap: 8px; }
+  .plan-row .v { font-size: 22px; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .plan-row .k { color: var(--text-secondary); font-size: 12px; white-space: nowrap; }
+  .plan-row .right { margin-left: auto; color: var(--text-secondary); font-size: 12px; display: flex; align-items: center; gap: 5px; white-space: nowrap; }
+  .plan-src { color: var(--text-muted); font-size: 11px; display: flex; align-items: center; gap: 4px; margin: -6px 0 12px; }
+  .plan-src .icon { width: 12px; height: 12px; }
+  .hint { color: var(--text-muted); font-size: 12px; display: flex; gap: 6px; align-items: flex-start; margin: -4px 0 14px; }
+  .hint .icon { width: 14px; height: 14px; margin-top: 1px; }
+  .link-btn { background: none; border: 0; padding: 0; font: inherit; color: var(--series-1); cursor: pointer;
+              display: inline-flex; align-items: center; gap: 6px; }
+  .link-btn:hover { text-decoration: underline; }
+  .add-toggle { margin-top: 14px; font-size: 13px; font-weight: 500; }
+  .add-toggle .chev { width: 13px; height: 13px; transition: transform .15s; }
+  .add-toggle[aria-expanded="true"] .chev { transform: rotate(90deg); }
   .card-head .edit { margin-left: auto; align-self: center; }
   .icon-btn { background: none; border: 1px solid transparent; color: var(--text-muted); border-radius: 6px;
               width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; }
@@ -163,7 +179,7 @@
   .acct-meta { color: var(--text-secondary); font-size: 12px; display: flex; gap: 10px; flex-wrap: wrap; }
   .acct-meta .warn { font-weight: 400; }
   .confirm { display: flex; gap: 6px; align-items: center; font-size: 12px; color: var(--text-secondary); }
-  form.acct-form { margin-top: 14px; border: 1px solid var(--border); border-radius: 10px; padding: 12px; }
+  form.acct-form { margin-top: 10px; border: 1px solid var(--border); border-radius: 10px; padding: 12px; }
   .form-title { font-weight: 600; margin-bottom: 10px; display: flex; align-items: center; gap: 6px; }
   .field { display: flex; flex-direction: column; gap: 4px; margin-bottom: 10px; }
   .field label { font-size: 12px; color: var(--text-secondary); }
@@ -198,6 +214,8 @@
   <symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></symbol>
   <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
   <symbol id="i-lock" viewBox="0 0 24 24"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></symbol>
+  <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v5"/><path d="M12 8h.01"/></symbol>
+  <symbol id="i-calendar" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></symbol>
   <symbol id="i-trend" viewBox="0 0 24 24"><path d="M3 17l6-6 4 4 8-8"/><path d="M15 7h6v6"/></symbol>
 </svg>
 
@@ -231,7 +249,10 @@
   <div class="panel-body">
     <div class="cfg-path" id="cfg-path"></div>
     <div id="acct-list"></div>
-    <form class="acct-form" id="acct-form" autocomplete="off">
+    <button class="link-btn add-toggle" type="button" id="add-toggle" aria-expanded="false" aria-controls="acct-form">
+      <svg class="icon"><use href="#i-plus"/></svg>Add account<svg class="icon chev"><use href="#i-chevron"/></svg>
+    </button>
+    <form class="acct-form" id="acct-form" autocomplete="off" hidden>
       <div class="form-title" id="form-title"></div>
       <input type="hidden" name="original">
       <div class="field">
@@ -305,6 +326,38 @@ function tile(label, t) {
   return `<div class="tile"><div class="label">${label}</div>
     <div class="value">${usd(t.cost_usd)}</div>
     <div class="sub">${tok(t.tokens)} tokens · ${t.messages.toLocaleString()} responses</div></div>`;
+}
+
+const dayTime = t => new Date(t).toLocaleString([], { weekday: 'short', hour: '2-digit', minute: '2-digit' });
+function untilText(t) {
+  const m = Math.max(0, Math.round((new Date(t) - Date.now()) / 60000));
+  return m < 24 * 60 ? dur(m) + ' left' : 'resets ' + dayTime(t);
+}
+
+// Real plan limits, as last reported by Claude Code to `ccmeter statusline`.
+function planHTML(p, b) {
+  if (!p || (!p.five_hour && !p.seven_day)) return '';
+  const row = (w, label, est) => {
+    if (!w) return '';
+    if (w.reset) {
+      return `<div class="plan"><div class="plan-row"><span class="v">0%</span><span class="k">${label}</span>
+        <span class="right">${icon('refresh')}reset since last report</span></div>${est || ''}</div>`;
+    }
+    const pct = Math.max(0, Math.min(w.used_pct, 100));
+    const has = w.resets_at && !w.resets_at.startsWith('0001');
+    return `<div class="plan">
+      <div class="plan-row"><span class="v">${Math.round(w.used_pct)}%</span><span class="k">${label}</span>
+        ${has ? `<span class="right">${icon(label.startsWith('of 5') ? 'clock' : 'calendar')}${untilText(w.resets_at)}</span>` : ''}</div>
+      <div class="bar" role="progressbar" aria-label="${label}" aria-valuenow="${Math.round(pct)}" aria-valuemin="0" aria-valuemax="100"><span style="width:${pct}%"></span></div>
+      ${est || ''}
+      ${w.used_pct >= 80 ? `<div class="block-meta"><span class="warn">${icon('alert')}${w.used_pct >= 100 ? 'Limit reached' : 'Near limit'}</span></div>` : ''}
+    </div>`;
+  };
+  const est = b && b.active ? `<div class="block-meta"><span>${usd(b.cost_usd)} est</span><span>${tok(b.tokens)} tokens</span>
+      <span>${icon('trend')} ${usd(b.burn_usd_per_hour)}/h</span></div>` : '';
+  const age = p.age_min < 1 ? 'just now' : dur(p.age_min) + ' ago';
+  return row(p.five_hour, 'of 5-hour plan limit', est) + row(p.seven_day, 'of weekly plan limit')
+    + `<div class="plan-src">${icon('info')}Reported by Claude Code, updated ${age}</div>`;
 }
 
 function blockHTML(b) {
@@ -408,7 +461,8 @@ function cardHTML(a, idx) {
     <div class="card-head"><h2>${esc(a.name)}</h2>
       <span class="status">${a.last_activity ? 'active ' + ago(a.last_activity) : 'no recent activity'}</span>${editBtn(a.name)}</div>
     <div class="dir" title="${esc(a.dir)}">${icon('folder')}${esc(a.dir)}</div>
-    ${blockHTML(a.block)}
+    ${a.plan && (a.plan.five_hour || a.plan.seven_day) ? planHTML(a.plan, a.block) : blockHTML(a.block) +
+      `<div class="hint">${icon('info')}<span>Estimated from local logs. For your real 5-hour and weekly plan limits, run <code>ccmeter statusline install</code>.</span></div>`}
     <div class="periods">${period('Today', a.today)}${period('7 days', a.week)}${period('30 days', a.month)}</div>
     ${chartHTML(a.daily, idx)}
     ${dailyTable(a.daily)}
@@ -503,10 +557,16 @@ function renderAcctList() {
         <button class="icon-btn danger" type="button" data-del="${esc(a.name)}" aria-label="Remove ${esc(a.name)}" title="Remove">${icon('trash')}</button>
       </span>` : ''}
     </div>`).join('') : '<div class="cfg-path">No accounts configured.</div>';
-  form.hidden = !s.editable;
+  $('#add-toggle').hidden = !s.editable;
+  if (!s.editable) setFormOpen(false);
   const note = $('#readonly-note');
   note.hidden = s.editable;
   note.querySelector('span').textContent = 'Editing is turned off here. Use ccmeter add / remove on the machine running the dashboard.';
+}
+
+function setFormOpen(open) {
+  form.hidden = !open;
+  $('#add-toggle').setAttribute('aria-expanded', String(open));
 }
 
 function fillForm(a) {
@@ -517,7 +577,6 @@ function fillForm(a) {
   F('weekly_limit_usd').value = a && a.weekly_limit_usd ? a.weekly_limit_usd : '';
   $('#form-title').innerHTML = a ? `${icon('pencil')}Edit ${esc(a.name)}` : `${icon('plus')}Add account`;
   $('#form-save').textContent = a ? 'Save changes' : 'Add account';
-  $('#form-cancel').hidden = !a;
   showError('');
 }
 function showError(msg) {
@@ -529,9 +588,12 @@ function showError(msg) {
 async function openAccounts(editName) {
   if (!dlg.open) await loadAccounts();
   renderAcctList();
-  fillForm(acctState.accounts?.find(a => a.name === editName));
+  const editing = acctState.accounts?.find(a => a.name === editName);
+  fillForm(editing);
+  // The form starts collapsed, except when editing or when there are no accounts yet.
+  setFormOpen(acctState.editable && (!!editing || !acctState.accounts?.length));
   if (!dlg.open) dlg.showModal();
-  F(editName ? 'dir' : 'name').focus();
+  if (!form.hidden) F(editName ? 'dir' : 'name').focus();
 }
 
 form.addEventListener('submit', async e => {
@@ -546,6 +608,7 @@ form.addEventListener('submit', async e => {
     acctState = await api('POST', '/api/accounts', body);
     renderAcctList();
     fillForm(null);
+    setFormOpen(false);
     load();
   } catch (err) {
     showError(err.message);
@@ -553,7 +616,13 @@ form.addEventListener('submit', async e => {
     $('#form-save').disabled = false;
   }
 });
-$('#form-cancel').onclick = () => fillForm(null);
+$('#form-cancel').onclick = () => { fillForm(null); setFormOpen(false); };
+$('#add-toggle').onclick = () => {
+  const open = form.hidden;
+  if (open) fillForm(null);
+  setFormOpen(open);
+  if (open) F('name').focus();
+};
 $('#acct-close').onclick = () => dlg.close();
 dlg.addEventListener('click', e => { if (e.target === dlg) dlg.close(); });
 
