@@ -92,6 +92,25 @@ ccmeter autostart disable  # remove and stop
 
 Autostart records the binary's absolute path, so install ccmeter where it will stay (re-run `autostart enable` after moving it). If you have no config file yet, `start` and `autostart enable` create one from the accounts detected at that moment, because a background process doesn't see your shell's `CLAUDE_CONFIG_DIR`.
 
+### Real plan limits (5-hour and weekly)
+
+The dollar amounts are estimates. Your real plan usage (the percentages `/usage` shows) can't be read from a script with the `claude` command. But Claude Code sends those percentages to its status-line command on every repaint, and ccmeter records them:
+
+```bash
+ccmeter statusline install          # every account; or: ccmeter statusline install work
+ccmeter statusline uninstall
+```
+
+This sets `statusLine` in each account's `settings.json` to `ccmeter statusline`. Other settings are kept, a `.bak` copy is written, and an existing custom status line is only replaced with `--force`. After the next Claude Code response in that account:
+
+- the status line shows `5h 42% (2h10m left) · week 31% (resets Wed 21:20)`
+- `ccmeter` and the dashboard show both plan bars with their reset times, marked with how long ago Claude Code reported them
+
+Notes:
+- **Plans:** only Pro, Max, Team and Enterprise logins get these numbers. API-key accounts keep the estimates.
+- **Freshness:** values update only while a Claude Code session runs in that account. When a reset time passes, ccmeter shows the window as reset instead of the old percentage.
+- **Storage:** reports are saved per config dir in `<user cache dir>/ccmeter/limits/`.
+
 ### Status line
 
 Add this to each account's `settings.json` (for example `~/.claude-work/settings.json`):
