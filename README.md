@@ -92,7 +92,41 @@ ccmeter autostart disable  # remove and stop
 
 Autostart records the binary's absolute path, so install ccmeter where it will stay (re-run `autostart enable` after moving it). If you have no config file yet, `start` and `autostart enable` create one from the accounts detected at that moment, because a background process doesn't see your shell's `CLAUDE_CONFIG_DIR`.
 
-### Real plan limits (5-hour and weekly)
+### Real plan limits from any Claude Code surface (hook)
+
+The status line only runs in the terminal version of Claude Code. Hooks also run in the VS Code/JetBrains extensions and the desktop app, so this is the way to get real limits there:
+
+```bash
+ccmeter hook install        # every account; or: ccmeter hook install work
+ccmeter limits              # fetch and print now
+ccmeter hook uninstall
+```
+
+This adds a `SessionStart` and a `Stop` hook to each account's `settings.json`. Other hooks are kept and a `.bak` copy is written. What happens on each turn:
+
+- **Fast and silent:** the hook returns in milliseconds, prints nothing and never blocks the turn.
+- **Finds the account itself:** from `CLAUDE_CONFIG_DIR` or the session's transcript path.
+- **Throttled:** at most every 5 minutes per account, it starts a background fetch of that account's 5-hour and weekly usage. The fetch uses the same usage endpoint as Claude Code's `/usage` screen and the account's own saved login (`.credentials.json`, or the macOS Keychain).
+- **Shared output:** results land where the table, dashboard and status line already look.
+
+Caveats:
+- **Undocumented endpoint:** it may change without notice. If it breaks, ccmeter keeps showing estimates and the error appears on the account's card.
+- **Read-only login use:** ccmeter never refreshes or writes your login. An expired token is skipped until Claude Code refreshes it (it does so whenever you use that account). If the endpoint returns "too many requests", ccmeter waits 15 minutes.
+- **macOS Keychain:** for config dirs other than `~/.claude`, the Keychain lookup is best effort.
+- **Debugging:** problems from background fetches are logged to `<user cache dir>/ccmeter/hook.log`.
+
+#### As a Claude Code plugin
+
+The repo is also a plugin marketplace. The plugin adds the same hooks plus a `/ccmeter:usage` command that shows the usage table in chat. It needs the `ccmeter` binary installed (on your PATH, in `~/go/bin`, `/usr/local/bin`, `/opt/homebrew/bin` or `~/.local/bin`, or set `CCMETER_BIN`).
+
+```
+/plugin marketplace add arman-arif/ccmeter
+/plugin install ccmeter@ccmeter
+```
+
+Newer Claude Code versions also accept `/plugin install ccmeter --marketplace arman-arif/ccmeter`. Use either the plugin or `ccmeter hook install`, not both. The plugin applies to every account where it's enabled; `hook install` is per account and uses the binary's absolute path.
+
+### Real plan limits via the status line (terminal only)
 
 The dollar amounts are estimates. Your real plan usage (the percentages `/usage` shows) can't be read from a script with the `claude` command. But Claude Code sends those percentages to its status-line command on every repaint, and ccmeter records them:
 

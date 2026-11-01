@@ -356,8 +356,9 @@ function planHTML(p, b) {
   const est = b && b.active ? `<div class="block-meta"><span>${usd(b.cost_usd)} est</span><span>${tok(b.tokens)} tokens</span>
       <span>${icon('trend')} ${usd(b.burn_usd_per_hour)}/h</span></div>` : '';
   const age = p.age_min < 1 ? 'just now' : dur(p.age_min) + ' ago';
+  const src = p.source === 'usage-endpoint' ? 'From your plan usage' : 'Reported by the Claude Code status line';
   return row(p.five_hour, 'of 5-hour plan limit', est) + row(p.seven_day, 'of weekly plan limit')
-    + `<div class="plan-src">${icon('info')}Reported by Claude Code, updated ${age}</div>`;
+    + `<div class="plan-src">${icon('info')}${src}, updated ${age}</div>`;
 }
 
 function blockHTML(b) {
@@ -462,7 +463,8 @@ function cardHTML(a, idx) {
       <span class="status">${a.last_activity ? 'active ' + ago(a.last_activity) : 'no recent activity'}</span>${editBtn(a.name)}</div>
     <div class="dir" title="${esc(a.dir)}">${icon('folder')}${esc(a.dir)}</div>
     ${a.plan && (a.plan.five_hour || a.plan.seven_day) ? planHTML(a.plan, a.block) : blockHTML(a.block) +
-      `<div class="hint">${icon('info')}<span>Estimated from local logs. For your real 5-hour and weekly plan limits, run <code>ccmeter statusline install</code>.</span></div>`}
+      `<div class="hint">${icon('info')}<span>Estimated from local logs. For your real 5-hour and weekly plan limits, run <code>ccmeter hook install</code>.</span></div>`}
+    ${a.plan_error ? `<div class="note" style="margin:-6px 0 12px">${icon('alert')}<span>Plan limits: ${esc(a.plan_error)}</span></div>` : ''}
     <div class="periods">${period('Today', a.today)}${period('7 days', a.week)}${period('30 days', a.month)}</div>
     ${chartHTML(a.daily, idx)}
     ${dailyTable(a.daily)}
