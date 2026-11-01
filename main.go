@@ -30,6 +30,11 @@ Usage:
                                  set ccmeter as the status line of every (or
                                  the named) account, to collect plan limits
   ccmeter statusline uninstall [NAME...]
+  ccmeter hook install [NAME...] add a Claude Code hook (works in the CLI, IDE
+                                 extensions and desktop app) that refreshes the
+                                 real plan limits after each response
+  ccmeter hook uninstall [NAME...]
+  ccmeter limits [NAME...]       fetch and print the real plan limits now
   ccmeter init [--force]         write a config file with detected accounts
   ccmeter accounts               list accounts and where the config lives
   ccmeter add NAME DIR [flags]   add an account (any path; --block-limit,
@@ -180,6 +185,25 @@ func main() {
 		if err := serve(cfg, cfgPath, pr, *addr, *every, *readOnly); err != nil {
 			fail(err)
 		}
+	case "hook":
+		if len(rest) > 0 && (rest[0] == "install" || rest[0] == "uninstall") {
+			if err := cmdHookSetup(cfgPath, rest[0], rest[1:]); err != nil {
+				fail(err)
+			}
+			return
+		}
+		cmdHook() // never fails: a hook must not disturb Claude Code
+		return
+	case "hook-fetch":
+		if len(rest) == 1 {
+			cmdHookFetch(rest[0])
+		}
+		return
+	case "limits":
+		if err := cmdLimits(cfg, rest); err != nil {
+			fail(err)
+		}
+		return
 	case "statusline":
 		if len(rest) > 0 && (rest[0] == "install" || rest[0] == "uninstall") {
 			if err := cmdStatuslineSetup(cfgPath, rest[0], rest[1:]); err != nil {
@@ -324,15 +348,19 @@ func printTable(r Report, verbose, none bool) {
 	var seen []string
 	for _, s := range r.Accounts {
 		if s.Plan != nil {
-			seen = append(seen, s.Name+" "+fmtDur(s.Plan.AgeMin)+" ago")
+			src := "status line"
+			if s.Plan.Source == "usage-endpoint" {
+				src = "usage endpoint"
+			}
+			seen = append(seen, fmt.Sprintf("%s %s ago (%s)", s.Name, fmtDur(s.Plan.AgeMin), src))
 		}
 	}
 	plan := len(seen) > 0
 	if plan {
-		fmt.Println("\nPlan limits as last reported by Claude Code: " + strings.Join(seen, ", "))
+		fmt.Println("\nPlan limits updated: " + strings.Join(seen, ", "))
 	}
 	fmt.Println("\nCosts are estimates at API list prices; % is of your limit, or of your own 30-day peak window.")
 	if !plan {
-		fmt.Println("Run `ccmeter statusline install` to also show the real plan limits Claude Code reports.")
+		fmt.Println("Run `ccmeter hook install` (or `ccmeter statusline install`) to also show your real plan limits.")
 	}
 }

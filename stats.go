@@ -72,7 +72,8 @@ type Summary struct {
 	Daily        []DayPoint  `json:"daily"` // last 30 days, oldest first
 	Models       []ModelRow  `json:"models"`
 	Unpriced     []string    `json:"unpriced,omitempty"`
-	Plan         *PlanLimits `json:"plan,omitempty"` // real limits reported by Claude Code
+	Plan         *PlanLimits `json:"plan,omitempty"`       // real plan limits
+	PlanError    string      `json:"plan_error,omitempty"` // last fetch problem, if recent
 }
 
 type Report struct {
@@ -117,6 +118,9 @@ func summarize(a *Account, pr *Pricer, now time.Time) Summary {
 	cfg, es, found, errStr, files := a.snapshot()
 	s := Summary{Name: cfg.Name, Dir: cfg.Dir, Found: found, Error: errStr, Files: files}
 	s.Plan = loadLimits(cfg.Dir, now)
+	if st := readFetchState(cfg.Dir); st.LastError != "" && now.Sub(st.LastAttempt) < 24*time.Hour {
+		s.PlanError = st.LastError
+	}
 	sort.Slice(es, func(i, j int) bool { return es[i].T.Before(es[j].T) })
 
 	local := now.Local()
