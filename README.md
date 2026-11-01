@@ -65,6 +65,33 @@ ccmeter json         # raw data
 ccmeter serve        # dashboard on http://127.0.0.1:7878 (-addr, -interval, -read-only)
 ```
 
+### Run in the background
+
+```bash
+ccmeter start              # dashboard in the background (same flags as serve: -addr, -interval, -read-only)
+ccmeter status             # running? pid, URL, config, log file, autostart state
+ccmeter restart            # stop + start, e.g. after upgrading the binary
+ccmeter stop
+```
+
+The process is detached from your terminal, so closing the terminal doesn't stop it. Its log goes to `<user cache dir>/ccmeter/ccmeter.log` (`~/.cache/ccmeter` on Linux, `~/Library/Caches/ccmeter` on macOS, `%LocalAppData%\ccmeter` on Windows). `stop` only signals the process after the dashboard confirms its pid, so a stale pid file can't kill something else.
+
+### Start on login
+
+```bash
+ccmeter autostart enable   # install and start now (accepts -addr, -interval, -read-only)
+ccmeter autostart status
+ccmeter autostart disable  # remove and stop
+```
+
+| OS | What gets installed | Notes |
+|----|---------------------|-------|
+| Linux | systemd user service `~/.config/systemd/user/ccmeter.service` | Restarts on crash. Logs: `journalctl --user -u ccmeter -f`. To run at boot before you log in: `loginctl enable-linger $USER`. Without a systemd user session it installs `~/.config/autostart/ccmeter.desktop` instead. |
+| macOS | LaunchAgent `~/Library/LaunchAgents/com.ccmeter.dashboard.plist` | Restarts on crash; logs to the cache dir. |
+| Windows | `ccmeter.vbs` in your Startup folder | Starts hidden at logon, no admin rights needed. |
+
+Autostart records the binary's absolute path, so install ccmeter where it will stay (re-run `autostart enable` after moving it). If you have no config file yet, `start` and `autostart enable` create one from the accounts detected at that moment, because a background process doesn't see your shell's `CLAUDE_CONFIG_DIR`.
+
 ### Status line
 
 Add this to each account's `settings.json` (for example `~/.claude-work/settings.json`):
