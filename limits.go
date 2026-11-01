@@ -31,7 +31,7 @@ type LimitWindow struct {
 
 // PlanLimits is what the dashboard and table read.
 type PlanLimits struct {
-	Source    string       `json:"source"` // "claude-code-statusline"
+	Source    string       `json:"source"` // "statusline" or "usage-endpoint"
 	UpdatedAt time.Time    `json:"updated_at"`
 	AgeMin    int          `json:"age_min"`
 	FiveHour  *LimitWindow `json:"five_hour,omitempty"`
@@ -100,17 +100,24 @@ func limitsFile(dir string) string {
 
 type savedLimits struct {
 	Dir       string       `json:"dir"`
+	Source    string       `json:"source,omitempty"`
 	UpdatedAt time.Time    `json:"updated_at"`
 	FiveHour  *LimitWindow `json:"five_hour,omitempty"`
 	SevenDay  *LimitWindow `json:"seven_day,omitempty"`
 }
 
-// saveLimits stores what Claude Code reported for the account in dir.
+// saveLimits stores what Claude Code reported to the status line for dir.
 func saveLimits(dir string, rl *rawRateLimits, now time.Time) error {
 	if rl == nil {
 		return nil
 	}
-	s := savedLimits{Dir: dir, UpdatedAt: now, FiveHour: rl.FiveHour.toWindow(), SevenDay: rl.SevenDay.toWindow()}
+	return saveLimitWindows(dir, "statusline", rl.FiveHour.toWindow(), rl.SevenDay.toWindow(), now)
+}
+
+// saveLimitWindows stores the latest plan windows for dir; the newest report
+// from any source wins.
+func saveLimitWindows(dir, source string, five, seven *LimitWindow, now time.Time) error {
+	s := savedLimits{Dir: dir, Source: source, UpdatedAt: now, FiveHour: five, SevenDay: seven}
 	if s.FiveHour == nil && s.SevenDay == nil {
 		return nil
 	}
@@ -137,7 +144,11 @@ func loadLimits(dir string, now time.Time) *PlanLimits {
 	if json.Unmarshal(b, &s) != nil || now.Sub(s.UpdatedAt) > 8*24*time.Hour {
 		return nil
 	}
-	pl := &PlanLimits{Source: "claude-code-statusline", UpdatedAt: s.UpdatedAt,
+	src := s.Source
+	if src == "" {
+		src = "statusline"
+	}
+	pl := &PlanLimits{Source: src, UpdatedAt: s.UpdatedAt,
 		AgeMin: int(now.Sub(s.UpdatedAt).Minutes()), FiveHour: s.FiveHour, SevenDay: s.SevenDay}
 	for _, w := range []*LimitWindow{pl.FiveHour, pl.SevenDay} {
 		if w != nil && !w.ResetsAt.IsZero() && now.After(w.ResetsAt) {
