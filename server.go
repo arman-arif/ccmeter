@@ -123,6 +123,10 @@ func serve(cfg Config, cfgPath string, pr *Pricer, addr string, every time.Durat
 		accts, pr := s.current()
 		writeJSON(w, http.StatusOK, buildReport(accts, pr, time.Now()))
 	})
+	started := time.Now()
+	mux.HandleFunc("GET /api/health", func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(w, http.StatusOK, healthInfo{PID: os.Getpid(), Version: version, Addr: addr, Config: cfgPath, Started: started})
+	})
 	mux.HandleFunc("GET /api/accounts", func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, s.accountList(r))
 	})

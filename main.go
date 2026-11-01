@@ -30,6 +30,17 @@ Usage:
   ccmeter add NAME DIR [flags]   add an account (any path; --block-limit,
                                  --weekly-limit in USD, --force to replace)
   ccmeter remove NAME|DIR        remove an account
+
+Background:
+  ccmeter start [serve flags]    run the dashboard in the background
+  ccmeter stop                   stop the background dashboard
+  ccmeter restart [serve flags]  stop, then start again
+  ccmeter status                 is it running, where, and is autostart on
+  ccmeter autostart enable [serve flags]
+                                 start the dashboard when you log in
+                                 (systemd/launchd/Windows Startup) and now
+  ccmeter autostart disable      remove autostart and stop it
+  ccmeter autostart status
   ccmeter version
 
 Global flag:
@@ -79,6 +90,32 @@ func main() {
 			fail(err)
 		}
 		fmt.Println("wrote", cfgPath)
+		return
+	case "start":
+		if err := cmdStart(cfgPath, rest, false); err != nil {
+			fail(err)
+		}
+		return
+	case "stop":
+		if err := cmdStop(false); err != nil {
+			fail(err)
+		}
+		return
+	case "restart":
+		if err := cmdStop(true); err != nil {
+			fail(err)
+		}
+		if err := cmdStart(cfgPath, rest, false); err != nil {
+			fail(err)
+		}
+		return
+	case "status":
+		cmdStatus(rest)
+		return
+	case "autostart":
+		if err := cmdAutostart(cfgPath, rest); err != nil {
+			fail(err)
+		}
 		return
 	case "add":
 		if err := cmdAdd(cfgPath, rest); err != nil {
@@ -131,7 +168,7 @@ func main() {
 		enc.Encode(buildReport(accts, pr, time.Now()))
 	case "serve":
 		fs := flag.NewFlagSet("serve", flag.ExitOnError)
-		addr := fs.String("addr", "127.0.0.1:7878", "listen address")
+		addr := fs.String("addr", defaultAddr, "listen address")
 		every := fs.Duration("interval", 10*time.Second, "rescan interval")
 		readOnly := fs.Bool("read-only", false, "disable managing accounts from the dashboard")
 		fs.Parse(rest)
