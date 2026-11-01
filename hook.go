@@ -41,6 +41,9 @@ func hookConfigDir(in hookInput) string {
 }
 
 func cmdHook() {
+	if os.Getenv(fetchGuardEnv) != "" {
+		return // fired by ccmeter's own `claude -p /usage` check
+	}
 	var in hookInput
 	if st, _ := os.Stdin.Stat(); st != nil && st.Mode()&os.ModeCharDevice == 0 {
 		b, _ := io.ReadAll(io.LimitReader(os.Stdin, 1<<20))

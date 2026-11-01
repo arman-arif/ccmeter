@@ -244,14 +244,7 @@ func refreshLimits(dir string, force bool) (*PlanLimits, error) {
 	st.NextAllowed = time.Time{}
 	writeFetchState(dir, st)
 
-	c, err := readCreds(dir)
-	if err == nil && !c.ExpiresAt.IsZero() && time.Until(c.ExpiresAt) < 30*time.Second {
-		err = errors.New("saved login has expired; open Claude Code in this account and it will refresh it")
-	}
-	var five, seven *LimitWindow
-	if err == nil {
-		five, seven, err = fetchUsage(c)
-	}
+	five, seven, source, err := fetchPlanLimits(dir, now)
 	if err != nil {
 		st.LastError = err.Error()
 		if errors.As(err, new(errRateLimited)) {
@@ -262,8 +255,38 @@ func refreshLimits(dir string, force bool) (*PlanLimits, error) {
 	}
 	st.LastError, st.LastOK = "", now
 	writeFetchState(dir, st)
-	if err := saveLimitWindows(dir, "usage-endpoint", five, seven, now); err != nil {
+	if err := saveLimitWindows(dir, source, five, seven, now); err != nil {
 		return nil, err
 	}
 	return loadLimits(dir, now), nil
+}
+
+// fetchPlanLimits tries `claude -p /usage` first (official, refreshes the
+// login itself), then the usage endpoint. CCMETER_LIMITS_SOURCE=cli or
+// =endpoint restricts it to one source.
+func fetchPlanLimits(dir string, now time.Time) (five, seven *LimitWindow, source string, err error) {
+	mode := strings.ToLower(os.Getenv("CCMETER_LIMITS_SOURCE"))
+	var cliErr error
+	if mode != "endpoint" {
+		if five, seven, cliErr = claudeUsage(dir, now); cliErr == nil {
+			return five, seven, "claude-cli", nil
+		}
+		if mode == "cli" {
+			return nil, nil, "", cliErr
+		}
+	}
+	c, err := readCreds(dir)
+	if err == nil && !c.ExpiresAt.IsZero() && time.Until(c.ExpiresAt) < 30*time.Second {
+		err = errors.New("saved login has expired; open Claude Code in this account and it will refresh it")
+	}
+	if err == nil {
+		five, seven, err = fetchUsage(c)
+	}
+	if err != nil {
+		if cliErr != nil && !errors.As(err, new(errRateLimited)) {
+			err = fmt.Errorf("%v; usage endpoint: %w", cliErr, err)
+		}
+		return nil, nil, "", err
+	}
+	return five, seven, "usage-endpoint", nil
 }
