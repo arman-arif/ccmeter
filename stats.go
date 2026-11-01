@@ -113,8 +113,8 @@ func splitBlocks(es []Entry, costs []float64) []blockSpan {
 }
 
 func summarize(a *Account, pr *Pricer, now time.Time) Summary {
-	es, found, errStr, files := a.snapshot()
-	s := Summary{Name: a.Cfg.Name, Dir: a.Cfg.Dir, Found: found, Error: errStr, Files: files}
+	cfg, es, found, errStr, files := a.snapshot()
+	s := Summary{Name: cfg.Name, Dir: cfg.Dir, Found: found, Error: errStr, Files: files}
 	sort.Slice(es, func(i, j int) bool { return es[i].T.Before(es[j].T) })
 
 	local := now.Local()
@@ -208,17 +208,17 @@ func summarize(a *Account, pr *Pricer, now time.Time) Summary {
 		}
 	}
 	switch {
-	case a.Cfg.BlockLimitUSD > 0:
-		s.Block.LimitUSD, s.Block.LimitSource = a.Cfg.BlockLimitUSD, "config"
+	case cfg.BlockLimitUSD > 0:
+		s.Block.LimitUSD, s.Block.LimitSource = cfg.BlockLimitUSD, "config"
 	case peak > 0:
 		s.Block.LimitUSD, s.Block.LimitSource = peak, "peak"
 	}
 	if s.Block.LimitUSD > 0 {
 		s.Block.Pct = 100 * s.Block.CostUSD / s.Block.LimitUSD
 	}
-	if a.Cfg.WeeklyLimitUSD > 0 {
-		s.Week.LimitUSD = a.Cfg.WeeklyLimitUSD
-		s.Week.Pct = 100 * s.Week.CostUSD / a.Cfg.WeeklyLimitUSD
+	if cfg.WeeklyLimitUSD > 0 {
+		s.Week.LimitUSD = cfg.WeeklyLimitUSD
+		s.Week.Pct = 100 * s.Week.CostUSD / cfg.WeeklyLimitUSD
 	}
 	return s
 }

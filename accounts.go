@@ -42,7 +42,7 @@ func saveConfig(path string, cfg Config) error {
 func absDir(dir string) (string, error) {
 	dir = expandHome(dir)
 	if dir == "" {
-		return "", fmt.Errorf("empty directory")
+		return "", fmt.Errorf("directory can't be empty")
 	}
 	return filepath.Abs(dir)
 }
@@ -51,6 +51,87 @@ func sameDir(a, b string) bool {
 	x, err1 := absDir(a)
 	y, err2 := absDir(b)
 	return err1 == nil && err2 == nil && x == y
+}
+
+func hasProjects(dir string) bool {
+	st, err := os.Stat(filepath.Join(expandHome(dir), "projects"))
+	return err == nil && st.IsDir()
+}
+
+// upsertAccount adds acct to cfg, or updates the account currently named
+// `original` when that is set (allowing a rename). With replace, an existing
+// account of the same name is overwritten. Returns whether one was replaced.
+func upsertAccount(cfg *Config, acct AccountConfig, original string, replace bool) (bool, error) {
+	acct.Name = strings.TrimSpace(acct.Name)
+	if acct.Name == "" {
+		return false, fmt.Errorf("account name can't be empty")
+	}
+	if acct.BlockLimitUSD < 0 || acct.WeeklyLimitUSD < 0 {
+		return false, fmt.Errorf("limits can't be negative")
+	}
+	abs, err := absDir(acct.Dir)
+	if err != nil {
+		return false, err
+	}
+	acct.Dir = abs
+
+	target := -1
+	if original != "" {
+		for i, a := range cfg.Accounts {
+			if a.Name == original {
+				target = i
+			}
+		}
+		if target < 0 {
+			return false, fmt.Errorf("no account named %q", original)
+		}
+	}
+	for i, a := range cfg.Accounts {
+		if i == target {
+			continue
+		}
+		if a.Name == acct.Name {
+			if !replace || target >= 0 {
+				return false, fmt.Errorf("account %q already exists (%s)", a.Name, a.Dir)
+			}
+			target = i
+			continue
+		}
+		if sameDir(a.Dir, abs) {
+			return false, fmt.Errorf("%s is already configured as account %q", abs, a.Name)
+		}
+	}
+	if target >= 0 {
+		cfg.Accounts[target] = acct
+		return true, nil
+	}
+	cfg.Accounts = append(cfg.Accounts, acct)
+	return false, nil
+}
+
+// removeAccount deletes the account matching key by name, then by dir.
+func removeAccount(cfg *Config, key string) (AccountConfig, error) {
+	idx := -1
+	for i, a := range cfg.Accounts {
+		if a.Name == key {
+			idx = i
+			break
+		}
+	}
+	if idx < 0 {
+		for i, a := range cfg.Accounts {
+			if sameDir(a.Dir, key) {
+				idx = i
+				break
+			}
+		}
+	}
+	if idx < 0 {
+		return AccountConfig{}, fmt.Errorf("no account named or located at %q", key)
+	}
+	removed := cfg.Accounts[idx]
+	cfg.Accounts = append(cfg.Accounts[:idx], cfg.Accounts[idx+1:]...)
+	return removed, nil
 }
 
 // cmdAdd: ccmeter add <name> <dir> [--block-limit USD] [--weekly-limit USD] [--force]
@@ -68,14 +149,6 @@ func cmdAdd(cfgPath string, args []string) error {
 		fs.Usage()
 		os.Exit(2)
 	}
-	name, dir := strings.TrimSpace(pos[0]), pos[1]
-	if name == "" {
-		return fmt.Errorf("account name can't be empty")
-	}
-	abs, err := absDir(dir)
-	if err != nil {
-		return err
-	}
 
 	cfg, fromFile, err := loadConfig(cfgPath)
 	if err != nil {
@@ -85,36 +158,32 @@ func cmdAdd(cfgPath string, args []string) error {
 		// First write: keep the auto-detected accounts so they don't disappear.
 		fmt.Printf("creating %s with %d auto-detected account(s)\n", cfgPath, len(cfg.Accounts))
 	}
-
-	replaced := false
-	for i, a := range cfg.Accounts {
-		switch {
-		case a.Name == name:
-			if !*force {
-				return fmt.Errorf("account %q already exists (%s); use --force to replace it", name, a.Dir)
-			}
-			cfg.Accounts[i] = AccountConfig{Name: name, Dir: abs, BlockLimitUSD: *block, WeeklyLimitUSD: *weekly}
-			replaced = true
-		case sameDir(a.Dir, abs):
-			return fmt.Errorf("%s is already configured as account %q", abs, a.Name)
+	acct := AccountConfig{Name: pos[0], Dir: pos[1], BlockLimitUSD: *block, WeeklyLimitUSD: *weekly}
+	replaced, err := upsertAccount(&cfg, acct, "", *force)
+	if err != nil {
+		if !*force && strings.Contains(err.Error(), "already exists") {
+			err = fmt.Errorf("%v; use --force to replace it", err)
 		}
-	}
-	if !replaced {
-		cfg.Accounts = append(cfg.Accounts, AccountConfig{Name: name, Dir: abs, BlockLimitUSD: *block, WeeklyLimitUSD: *weekly})
+		return err
 	}
 	if err := saveConfig(cfgPath, cfg); err != nil {
 		return err
 	}
-
+	saved := cfg.Accounts[len(cfg.Accounts)-1]
+	for _, a := range cfg.Accounts {
+		if a.Name == strings.TrimSpace(pos[0]) {
+			saved = a
+		}
+	}
 	verb := "added"
 	if replaced {
 		verb = "replaced"
 	}
-	fmt.Printf("%s %s -> %s\n", verb, name, abs)
-	if st, err := os.Stat(filepath.Join(abs, "projects")); err != nil || !st.IsDir() {
-		fmt.Fprintf(os.Stderr, "warning: %s has no projects/ folder yet; it will show as not found until Claude Code has run with CLAUDE_CONFIG_DIR=%s\n", abs, abs)
+	fmt.Printf("%s %s -> %s\n", verb, saved.Name, saved.Dir)
+	if !hasProjects(saved.Dir) {
+		fmt.Fprintf(os.Stderr, "warning: %s has no projects/ folder yet; it will show as not found until Claude Code has run with CLAUDE_CONFIG_DIR=%s\n", saved.Dir, saved.Dir)
 	}
-	fmt.Println("restart `ccmeter serve` if it is running so it picks up the change")
+	fmt.Println("a running `ccmeter serve` picks this up within one rescan")
 	return nil
 }
 
@@ -124,31 +193,14 @@ func cmdRemove(cfgPath string, args []string) error {
 		fmt.Fprintln(os.Stderr, "usage: ccmeter remove <name|dir>")
 		os.Exit(2)
 	}
-	key := args[0]
 	cfg, fromFile, err := loadConfig(cfgPath)
 	if err != nil {
 		return err
 	}
-	idx := -1
-	for i, a := range cfg.Accounts {
-		if a.Name == key {
-			idx = i
-			break
-		}
+	removed, err := removeAccount(&cfg, args[0])
+	if err != nil {
+		return fmt.Errorf("%v (see `ccmeter accounts`)", err)
 	}
-	if idx < 0 {
-		for i, a := range cfg.Accounts {
-			if sameDir(a.Dir, key) {
-				idx = i
-				break
-			}
-		}
-	}
-	if idx < 0 {
-		return fmt.Errorf("no account named or located at %q (see `ccmeter accounts`)", key)
-	}
-	removed := cfg.Accounts[idx]
-	cfg.Accounts = append(cfg.Accounts[:idx], cfg.Accounts[idx+1:]...)
 	if err := saveConfig(cfgPath, cfg); err != nil {
 		return err
 	}

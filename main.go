@@ -22,7 +22,8 @@ const usage = `ccmeter - Claude Code usage meter for multiple accounts
 Usage:
   ccmeter [table] [-v]           usage table for every account (default)
   ccmeter json                   same data as JSON
-  ccmeter serve [-addr ADDR]     web dashboard (default 127.0.0.1:7878)
+  ccmeter serve [-addr ADDR]     web dashboard (default 127.0.0.1:7878);
+                                 -read-only turns off account editing
   ccmeter statusline             one-line meter for Claude Code's status line
   ccmeter init [--force]         write a config file with detected accounts
   ccmeter accounts               list accounts and where the config lives
@@ -132,8 +133,9 @@ func main() {
 		fs := flag.NewFlagSet("serve", flag.ExitOnError)
 		addr := fs.String("addr", "127.0.0.1:7878", "listen address")
 		every := fs.Duration("interval", 10*time.Second, "rescan interval")
+		readOnly := fs.Bool("read-only", false, "disable managing accounts from the dashboard")
 		fs.Parse(rest)
-		if err := serve(cfg, cfgPath, pr, *addr, *every); err != nil {
+		if err := serve(cfg, cfgPath, pr, *addr, *every, *readOnly); err != nil {
 			fail(err)
 		}
 	case "statusline":

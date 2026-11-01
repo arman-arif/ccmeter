@@ -74,11 +74,10 @@ var usageMarker = []byte(`"usage"`)
 // Scan reads new lines from the account's projects/ folder. Files last
 // modified before cutoff are skipped, and so are entries older than cutoff.
 func (a *Account) Scan(cutoff time.Time) {
-	root := filepath.Join(expandHome(a.Cfg.Dir), "projects")
-	st, err := os.Stat(root)
-
 	a.mu.Lock()
 	defer a.mu.Unlock()
+	root := filepath.Join(expandHome(a.Cfg.Dir), "projects")
+	st, err := os.Stat(root)
 	if err != nil || !st.IsDir() {
 		a.found = false
 		if err != nil {
@@ -187,10 +186,17 @@ func (a *Account) parseLine(line []byte, cutoff time.Time) {
 }
 
 // snapshot returns a copy of the entries for computing stats without holding the lock.
-func (a *Account) snapshot() ([]Entry, bool, string, int) {
+func (a *Account) snapshot() (AccountConfig, []Entry, bool, string, int) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	out := make([]Entry, len(a.entries))
 	copy(out, a.entries)
-	return out, a.found, a.lastErr, len(a.files)
+	return a.Cfg, out, a.found, a.lastErr, len(a.files)
+}
+
+// setConfig updates name and limits of an account whose dir is unchanged.
+func (a *Account) setConfig(c AccountConfig) {
+	a.mu.Lock()
+	a.Cfg = c
+	a.mu.Unlock()
 }
