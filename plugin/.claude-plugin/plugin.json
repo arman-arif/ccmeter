@@ -1,0 +1,12 @@
+{
+  "name": "ccmeter",
+  "version": "0.2.0",
+  "description": "Refreshes ccmeter's real 5-hour and weekly plan limits after each turn (CLI, IDE extensions, desktop app) and adds /ccmeter:usage. Requires the ccmeter binary.",
+  "author": {
+    "name": "Ariful Islam"
+  },
+  "homepage": "https://github.com/arman-arif/ccmeter",
+  "repository": "https://github.com/arman-arif/ccmeter",
+  "license": "MIT",
+  "icon": "./.claude-plugin/icon.png"
+}

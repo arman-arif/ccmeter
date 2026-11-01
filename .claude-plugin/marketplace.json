@@ -1,0 +1,14 @@
+{
+  "name": "ccmeter",
+  "owner": {
+    "name": "Ariful Islam"
+  },
+  "description": "ccmeter: Claude Code usage meter for multiple accounts",
+  "plugins": [
+    {
+      "name": "ccmeter",
+      "source": "./plugin",
+      "description": "Real 5-hour and weekly plan limits for ccmeter from any Claude Code surface, plus a /ccmeter:usage command"
+    }
+  ]
+}

@@ -1,0 +1,11 @@
+{
+  "description": "Ask ccmeter to refresh plan limits (throttled, non-blocking)",
+  "hooks": {
+    "SessionStart": [
+      { "hooks": [ { "type": "command", "command": "sh \"${CLAUDE_PLUGIN_ROOT}/scripts/ccmeter-hook.sh\"" } ] }
+    ],
+    "Stop": [
+      { "hooks": [ { "type": "command", "command": "sh \"${CLAUDE_PLUGIN_ROOT}/scripts/ccmeter-hook.sh\"" } ] }
+    ]
+  }
+}
