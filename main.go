@@ -6,6 +6,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 	"text/tabwriter"
 	"time"
@@ -25,6 +26,9 @@ Usage:
   ccmeter statusline             one-line meter for Claude Code's status line
   ccmeter init [--force]         write a config file with detected accounts
   ccmeter accounts               list accounts and where the config lives
+  ccmeter add NAME DIR [flags]   add an account (any path; --block-limit,
+                                 --weekly-limit in USD, --force to replace)
+  ccmeter remove NAME|DIR        remove an account
   ccmeter version
 
 Global flag:
@@ -75,6 +79,16 @@ func main() {
 		}
 		fmt.Println("wrote", cfgPath)
 		return
+	case "add":
+		if err := cmdAdd(cfgPath, rest); err != nil {
+			fail(err)
+		}
+		return
+	case "remove", "rm":
+		if err := cmdRemove(cfgPath, rest); err != nil {
+			fail(err)
+		}
+		return
 	}
 
 	cfg, fromFile, err := loadConfig(cfgPath)
@@ -91,7 +105,17 @@ func main() {
 			fmt.Println("config: none (auto-detected; run `ccmeter init` to create", cfgPath+")")
 		}
 		for _, a := range cfg.Accounts {
-			fmt.Printf("  %-16s %s\n", a.Name, a.Dir)
+			line := fmt.Sprintf("  %-16s %s", a.Name, a.Dir)
+			if st, err := os.Stat(filepath.Join(expandHome(a.Dir), "projects")); err != nil || !st.IsDir() {
+				line += "  (no projects/ folder)"
+			}
+			if a.BlockLimitUSD > 0 {
+				line += "  5h limit " + fmtUSD(a.BlockLimitUSD)
+			}
+			if a.WeeklyLimitUSD > 0 {
+				line += "  weekly limit " + fmtUSD(a.WeeklyLimitUSD)
+			}
+			fmt.Println(line)
 		}
 	case "table":
 		fs := flag.NewFlagSet("table", flag.ExitOnError)

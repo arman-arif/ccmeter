@@ -20,6 +20,17 @@ ccmeter init        # writes ~/.config/ccmeter/config.json with every config dir
 ccmeter accounts    # shows what it will read
 ```
 
+Config dirs can live anywhere, not just your home folder. Add or remove them without editing JSON:
+
+```bash
+ccmeter add work /mnt/data/claude-work --block-limit 40 --weekly-limit 600
+ccmeter add client ./clients/acme/.claude      # relative paths are made absolute
+ccmeter add work /new/path --force             # replace an existing account
+ccmeter remove client                          # by name or by dir
+```
+
+The first `add` or `remove` creates the config file and keeps any auto-detected accounts in it.
+
 Without a config file, ccmeter looks in `$CLAUDE_CONFIG_DIR` (comma separated), `~/.claude`, `~/.config/claude` and `~/.claude-*`.
 
 ```json
