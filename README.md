@@ -31,6 +31,10 @@ ccmeter remove client                          # by name or by dir
 
 The first `add` or `remove` creates the config file and keeps any auto-detected accounts in it.
 
+You can do the same from the dashboard: the **Accounts** button (or the pencil on a card) opens a panel to add, edit, rename or remove accounts and set their limits. Changes are saved to the same config file. A running dashboard also picks up edits made with the CLI or by hand within one rescan.
+
+Editing in the dashboard only works from the machine running it (loopback requests from the dashboard's own page). Start it with `ccmeter serve -read-only` to turn editing off entirely.
+
 Without a config file, ccmeter looks in `$CLAUDE_CONFIG_DIR` (comma separated), `~/.claude`, `~/.config/claude` and `~/.claude-*`.
 
 ```json
@@ -58,7 +62,7 @@ To run Claude Code against a second account: `CLAUDE_CONFIG_DIR=~/.claude-work c
 ccmeter              # table: 5-hour window, today, 7 days, 30 days per account
 ccmeter -v           # plus a per-model breakdown
 ccmeter json         # raw data
-ccmeter serve        # dashboard on http://127.0.0.1:7878 (-addr, -interval)
+ccmeter serve        # dashboard on http://127.0.0.1:7878 (-addr, -interval, -read-only)
 ```
 
 ### Status line
