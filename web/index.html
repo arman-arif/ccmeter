@@ -84,7 +84,8 @@
 
   .block { border: 1px solid var(--border); border-radius: 10px; padding: 12px; margin-bottom: 14px; }
   .block-top { display: flex; align-items: baseline; gap: 8px; }
-  .block-top .k { color: var(--text-secondary); font-size: 12px; }
+  .block-top .k { color: var(--text-secondary); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+  .block-top .right { white-space: nowrap; }
   .block-top .v { font-size: 22px; font-weight: 600; font-variant-numeric: tabular-nums; }
   .block-top .right { margin-left: auto; color: var(--text-secondary); font-size: 12px;
                       display: flex; align-items: center; gap: 5px; }
@@ -224,13 +225,13 @@ function blockHTML(b) {
   const pct = b.limit_usd > 0 ? b.pct : null;
   const fill = pct == null ? 0 : Math.min(pct, 100);
   const proj = b.limit_usd > 0 ? Math.min(100 * b.projected_usd / b.limit_usd, 100) : null;
-  const limitLabel = b.limit_source === 'config' ? 'of limit' : 'of your 30-day peak';
+  const limitLabel = b.limit_source === 'config' ? 'of limit' : 'of 30-day peak';
   const near = pct != null && pct >= 80;
   return `<div class="block">
     <div class="block-top">
       <span class="v">${usd(b.cost_usd)}</span>
       <span class="k">${pct != null ? Math.round(pct) + '% ' + limitLabel : '5-hour window'}</span>
-      <span class="right">${icon('clock')}${dur(b.remaining_min)} left · resets ${hhmm(b.end)}</span>
+      <span class="right">${icon('clock')}${dur(b.remaining_min)} left</span>
     </div>
     ${pct != null ? `<div class="bar" role="progressbar" aria-valuenow="${Math.round(fill)}" aria-valuemin="0" aria-valuemax="100">
       <span style="width:${fill}%"></span>${proj != null && proj > fill ? `<i style="left:calc(${proj}% - 1px)" title="Projected at current pace"></i>` : ''}</div>` : '<div style="height:8px"></div>'}
@@ -238,8 +239,8 @@ function blockHTML(b) {
       <span>${tok(b.tokens)} tokens</span>
       <span>${icon('trend')} ${usd(b.burn_usd_per_hour)}/h</span>
       <span>projected ${usd(b.projected_usd)}</span>
-      <span>started ${hhmm(b.start)}</span>
-      ${near ? `<span class="warn">${icon('alert')}Near limit</span>` : ''}
+      <span>${hhmm(b.start)} – ${hhmm(b.end)}</span>
+      ${near ? `<span class="warn">${icon('alert')}${pct >= 100 ? (b.limit_source === 'peak' ? 'New peak' : 'Over limit') : 'Near limit'}</span>` : ''}
     </div>
   </div>`;
 }
