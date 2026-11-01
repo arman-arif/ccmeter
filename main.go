@@ -348,9 +348,9 @@ func printTable(r Report, verbose, none bool) {
 	var seen []string
 	for _, s := range r.Accounts {
 		if s.Plan != nil {
-			src := "status line"
-			if s.Plan.Source == "usage-endpoint" {
-				src = "usage endpoint"
+			src := map[string]string{"usage-endpoint": "usage endpoint", "claude-cli": "claude /usage"}[s.Plan.Source]
+			if src == "" {
+				src = "status line"
 			}
 			seen = append(seen, fmt.Sprintf("%s %s ago (%s)", s.Name, fmtDur(s.Plan.AgeMin), src))
 		}

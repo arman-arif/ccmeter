@@ -356,7 +356,8 @@ function planHTML(p, b) {
   const est = b && b.active ? `<div class="block-meta"><span>${usd(b.cost_usd)} est</span><span>${tok(b.tokens)} tokens</span>
       <span>${icon('trend')} ${usd(b.burn_usd_per_hour)}/h</span></div>` : '';
   const age = p.age_min < 1 ? 'just now' : dur(p.age_min) + ' ago';
-  const src = p.source === 'usage-endpoint' ? 'From your plan usage' : 'Reported by the Claude Code status line';
+  const src = { 'claude-cli': 'From claude /usage', 'usage-endpoint': 'From your plan usage' }[p.source]
+    || 'Reported by the Claude Code status line';
   return row(p.five_hour, 'of 5-hour plan limit', est) + row(p.seven_day, 'of weekly plan limit')
     + `<div class="plan-src">${icon('info')}${src}, updated ${age}</div>`;
 }
