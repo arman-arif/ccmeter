@@ -50,3 +50,17 @@ export function niceMax(v: number): number {
   for (const m of [1, 2, 2.5, 5, 10]) if (m * p >= v) return m * p;
   return 10 * p;
 }
+
+export const dateTime = (t: string) =>
+  new Date(t).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+
+// The local day of a full timestamp.
+export const shortDay = (t: string) => new Date(t).toLocaleDateString([], { month: 'short', day: 'numeric' });
+
+export const percent = (part: number, whole: number) => (whole > 0 ? Math.round((100 * part) / whole) + '%' : '0%');
+
+// The last folder of a path, on any OS. Log folder names have no separators
+// and come back whole.
+export const baseName = (path: string) => path.split(/[\\/]/).filter(Boolean).pop() ?? path;
+
+export const shortModel = (m: string) => m.replace(/^claude-/, '');

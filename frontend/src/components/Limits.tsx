@@ -71,6 +71,8 @@ const SOURCES: Record<string, string> = {
   'usage-endpoint': 'From your plan usage',
 };
 
+export const planSource = (source: string) => SOURCES[source] ?? 'Reported by the Claude Code status line';
+
 // Real plan limits, as last reported by Claude Code.
 export function PlanBars({ plan, block }: { plan: PlanLimits; block: Block }) {
   const estimate = block.active && (
@@ -88,7 +90,7 @@ export function PlanBars({ plan, block }: { plan: PlanLimits; block: Block }) {
       {plan.seven_day && <PlanWindow w={plan.seven_day} label="of weekly plan limit" icon="calendar" />}
       <div className="plan-src">
         <Icon name="info" />
-        {SOURCES[plan.source] ?? 'Reported by the Claude Code status line'}, updated{' '}
+        {planSource(plan.source)}, updated{' '}
         {plan.age_min < 1 ? 'just now' : dur(plan.age_min) + ' ago'}
       </div>
     </>

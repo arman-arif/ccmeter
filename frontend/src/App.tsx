@@ -3,7 +3,8 @@ import { api, type AccountsResponse, type Report } from './api';
 import { AccountsDialog } from './components/AccountsDialog';
 import { Icon } from './components/Icon';
 import { usePoll } from './hooks';
-import { Link, matchRoute, useUrl } from './router';
+import { accountPath, Link, matchRoute, navigate, useUrl } from './router';
+import { Account } from './pages/Account';
 import { Overview } from './pages/Overview';
 import { NotFound } from './pages/NotFound';
 
@@ -126,8 +127,26 @@ export function App() {
         </button>
       </header>
 
+      <nav className="tabs" aria-label="Accounts">
+        <Link className="tab" href="/" aria-current={route.page === 'overview' ? 'page' : undefined}>
+          Overview
+        </Link>
+        {(summary.data?.accounts ?? []).map(a => (
+          <Link
+            key={a.name}
+            className="tab"
+            // Keep the chosen range and measure when moving between accounts.
+            href={accountPath(a.name) + (route.page === 'account' ? url.search : '')}
+            aria-current={route.page === 'account' && route.name === a.name ? 'page' : undefined}
+          >
+            {a.name}
+          </Link>
+        ))}
+      </nav>
+
       {route.page === 'overview' && <Overview report={summary.data} onEdit={onEdit} onAdd={() => openAccounts()} />}
-      {route.page !== 'overview' && <NotFound what="That page doesn't exist." />}
+      {route.page === 'account' && <Account key={route.name} name={route.name} tick={tick} onEdit={onEdit} />}
+      {route.page === 'missing' && <NotFound what="That page doesn't exist." />}
 
       {dialog && (
         <AccountsDialog
@@ -138,8 +157,15 @@ export function App() {
             setAccounts(next);
             reload();
           }}
-          onSaved={() => {}}
-          onRemoved={() => {}}
+          onSaved={(original, name) => {
+            // Renaming the account on screen: follow it to its new address.
+            if (route.page === 'account' && route.name === original && name !== original) {
+              navigate(accountPath(name) + url.search, { replace: true, keepScroll: true });
+            }
+          }}
+          onRemoved={name => {
+            if (route.page === 'account' && route.name === name) navigate('/', { replace: true });
+          }}
         />
       )}
     </div>

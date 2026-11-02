@@ -5,6 +5,7 @@ import { Icon } from '../components/Icon';
 import { BlockEstimate, hasPlan, PlanBars } from '../components/Limits';
 import { ago, longDate, shortDate, tok, usd } from '../format';
 import { useTitle } from '../hooks';
+import { accountPath, Link } from '../router';
 
 function EditButton({ name, onEdit }: { name: string; onEdit?: (name: string) => void }) {
   if (!onEdit) return null;
@@ -16,7 +17,17 @@ function EditButton({ name, onEdit }: { name: string; onEdit?: (name: string) =>
 }
 
 function AccountCard({ a, onEdit }: { a: Summary; onEdit?: (name: string) => void }) {
-  const title = <h2>{a.name}</h2>;
+  const title = (
+    <h2>
+      <Link href={accountPath(a.name)}>{a.name}</Link>
+    </h2>
+  );
+  const details = (
+    <Link className="card-link" href={accountPath(a.name)}>
+      View details
+      <Icon name="chevron" />
+    </Link>
+  );
   if (!a.found) {
     return (
       <article className="card">
@@ -31,6 +42,7 @@ function AccountCard({ a, onEdit }: { a: Summary; onEdit?: (name: string) => voi
             No <code>projects/</code> folder found in this config dir.
           </span>
         </div>
+        {details}
       </article>
     );
   }
@@ -89,6 +101,7 @@ function AccountCard({ a, onEdit }: { a: Summary; onEdit?: (name: string) => voi
           </span>
         </div>
       )}
+      {details}
     </article>
   );
 }

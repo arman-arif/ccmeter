@@ -108,3 +108,58 @@ export async function api<T>(method: string, url: string, body?: unknown): Promi
   if (!res.ok) throw new Error(out.error || res.statusText);
   return out as T;
 }
+
+export interface ProjectRow extends Totals {
+  path: string;
+  sessions: number;
+  last_active: string;
+}
+
+export interface SessionRow extends Totals {
+  id: string;
+  project: string;
+  models: string[] | null;
+  start: string;
+  last: string;
+}
+
+export interface BlockRow extends Totals {
+  start: string;
+  end: string;
+  last: string;
+  active: boolean;
+}
+
+export interface HourCell extends Totals {
+  weekday: number;
+  hour: number;
+}
+
+export interface RangeDetail extends Totals {
+  days: number;
+  from: string;
+  to: string;
+  daily: DayPoint[];
+  models: ModelRow[];
+  projects: ProjectRow[];
+  sessions: SessionRow[];
+  session_count: number;
+  blocks: BlockRow[];
+  hours: HourCell[];
+}
+
+export interface AccountSetup {
+  hooks: boolean;
+  plugin: boolean;
+  status_line: boolean;
+  settings_error?: string;
+  last_attempt?: string;
+  last_ok?: string;
+  next_allowed?: string;
+  last_error?: string;
+}
+
+export interface AccountDetail extends Summary {
+  setup: AccountSetup;
+  range: RangeDetail;
+}
