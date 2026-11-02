@@ -123,13 +123,14 @@ This adds a `SessionStart` and a `Stop` hook to each account's `settings.json`. 
 - **Fast and silent:** the hook returns in milliseconds, prints nothing and never blocks the turn.
 - **Finds the account itself:** from `CLAUDE_CONFIG_DIR` or the session's transcript path.
 - **Throttled:** at most every 5 minutes per account, it starts a background check of that account's 5-hour and weekly usage. The check runs `claude -p /usage --output-format json` with that account's `CLAUDE_CONFIG_DIR`. Claude Code answers `/usage` locally (no model call, no usage cost) and refreshes the login itself if needed. The check uses `--no-session-persistence`, no MCP servers and hooks disabled, so it leaves no session behind and doesn't trigger your hooks.
-- **Fallback:** if the `claude` CLI isn't found (set `CCMETER_CLAUDE_BIN` if it isn't on your PATH) or gives no limits, ccmeter calls the usage endpoint behind `/usage` directly, using the account's saved login (`.credentials.json`, or the macOS Keychain). Set `CCMETER_LIMITS_SOURCE=cli` or `=endpoint` to use only one.
+- **Needs the `claude` CLI:** if it isn't on your PATH (common for background services and GUI-launched editors), set `CCMETER_CLAUDE_BIN` to its path. Without it, ccmeter shows estimates only.
+- **Optional direct endpoint (off by default):** `CCMETER_LIMITS_SOURCE=auto` makes ccmeter fall back to the usage endpoint behind `/usage` when the CLI fails, and `=endpoint` uses only that endpoint. Either way, ccmeter reads the account's saved login token (`.credentials.json`, or the macOS Keychain) and sends it to that endpoint itself. Anthropic's [usage policy](https://code.claude.com/docs/en/legal-and-compliance#authentication-and-credential-use) reserves Claude subscription logins for Claude Code and Anthropic's own apps, so read it and decide for yourself before turning this on.
 - **Shared output:** results land where the table, dashboard and status line already look.
 
 Caveats:
-- **Text format:** the `claude -p /usage` text (`Current session: 4% used · resets Nov 2, 10:30am (Asia/Dhaka)`) and the fallback endpoint aren't formal APIs. If either changes, ccmeter keeps showing estimates and the error appears on the account's card.
-- **Read-only login use in the fallback:** the endpoint fallback never refreshes or writes your login. An expired token is skipped until Claude Code refreshes it. If the endpoint returns "too many requests", ccmeter waits 15 minutes.
-- **macOS Keychain:** for config dirs other than `~/.claude`, the Keychain lookup is best effort.
+- **Text format:** the `claude -p /usage` text (`Current session: 4% used · resets Nov 2, 10:30am (Asia/Dhaka)`) and the optional endpoint aren't formal APIs. If either changes, ccmeter keeps showing estimates and the error appears on the account's card.
+- **Read-only login use by the endpoint:** when turned on, the endpoint check never refreshes or writes your login. An expired token is skipped until Claude Code refreshes it. If the endpoint returns "too many requests", ccmeter waits 15 minutes.
+- **macOS Keychain (endpoint only):** for config dirs other than `~/.claude`, the Keychain lookup is best effort.
 - **Debugging:** problems from background fetches are logged to `<user cache dir>/ccmeter/hook.log`.
 
 #### As a Claude Code plugin

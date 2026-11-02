@@ -61,7 +61,7 @@ Global flag: `-config PATH`. Default: `$CCMETER_CONFIG`, else `<user config dir>
 | `statusline.go` | `ccmeter statusline`: picks the account from `CLAUDE_CONFIG_DIR`, then the transcript path, then the first account. Saves `rate_limits` and prints one line. |
 | `limits.go` | Plan limit storage: `LimitWindow`, `PlanLimits`, `saveLimitWindows` / `loadLimits` (one file per config dir, keyed by a hash of the dir). Marks a window `Reset` once its reset time passes. Status-line install/uninstall. |
 | `claudecli.go` | **Primary limits source:** runs `claude -p /usage --output-format json` per account and parses the text. |
-| `usageapi.go` | **Fallback source:** the undocumented endpoint behind `/usage`. Also the read-only credential reader, the fetch state file (throttle and backoff), the per-account lock, `refreshLimits` and `fetchPlanLimits` (CLI first, then endpoint). |
+| `usageapi.go` | **Opt-in source:** the undocumented endpoint behind `/usage`. Also the read-only credential reader, the fetch state file (throttle and backoff), the per-account lock, `refreshLimits` and `fetchPlanLimits` (CLI only by default; `auto` adds the endpoint as a fallback). |
 | `limitsched.go` | Scheduler inside `serve` (active accounts every `-limits-interval`, default 5m; idle accounts every 30m; one at a time). Manual refresh trigger. `refreshDueLimits` is used by table/json. |
 | `hook.go` | `ccmeter hook` (finds the account from `CLAUDE_CONFIG_DIR` or `<dir>/projects/...` in the transcript path, then spawns a detached `hook-fetch` when one is due), `limits`, and hook install/uninstall with settings.json merging. |
 | `server.go` | HTTP server. Hot-reloads the config while keeping scan state for unchanged dirs. API routes are listed below. Write routes only accept loopback requests from the dashboard's own origin (`sameMachine`); `-read-only` disables account edits. |
@@ -70,7 +70,7 @@ Global flag: `-config PATH`. Default: `$CCMETER_CONFIG`, else `<user config dir>
 | `autostart.go` | Per-OS autostart. Renderers for the systemd unit, desktop entry, launchd plist and VBS, with careful quoting (unit-tested). |
 | `web/index.html` | The whole dashboard: vanilla JS and CSS, SVG icon sprite, light/dark theme toggle, totals tiles, account cards (plan bars or estimate block, period stats, 30-day bar chart, daily and model tables), Accounts dialog (collapsible add/edit form, inline delete confirmation). Polls `/api/summary` every 15s. |
 | `plugin/` and `.claude-plugin/marketplace.json` | Claude Code plugin (see below). |
-| `*_test.go` | Tests for autostart renderers, /usage parsing (real output fixture), the fake-CLI flow, hook routing, settings merge, endpoint fetch with throttle and expiry, and the scheduler. |
+| `*_test.go` | Tests for autostart renderers, /usage parsing (real output fixture), the fake-CLI flow, hook routing, settings merge, endpoint fetch with throttle and expiry, the endpoint being opt-in, and the scheduler. |
 
 ### HTTP API (`server.go`)
 - `GET /api/summary`: the `Report` (all accounts and totals).
@@ -94,14 +94,14 @@ Dollar figures are estimates from local logs. The real plan percentages come fro
    - Working dir is the ccmeter state dir. The child gets `CCMETER_IN_FETCH=1` so ccmeter's own hook doesn't recurse.
    - For the default `~/.claude` account, **`CLAUDE_CONFIG_DIR` is left unset**. Setting it, even to the default path, can change the macOS Keychain item name.
    - Claude Code refreshes the login itself in this path.
-2. **Usage endpoint (fallback).** `GET https://api.anthropic.com/api/oauth/usage` with `Authorization: Bearer <token>` and `anthropic-beta: oauth-2025-04-20`. It returns `five_hour` / `seven_day` with `utilization` (0-100) and `resets_at`. This is undocumented.
+2. **Usage endpoint (opt-in, off by default).** Only with `CCMETER_LIMITS_SOURCE=auto` (CLI, then endpoint) or `=endpoint`. It sends the account's saved subscription login token to Anthropic directly, and Anthropic's usage policy (code.claude.com/docs/en/legal-and-compliance, "Authentication and credential use") reserves those logins for Claude Code and Anthropic's own apps, so it must never be on by default. `GET https://api.anthropic.com/api/oauth/usage` with `Authorization: Bearer <token>` and `anthropic-beta: oauth-2025-04-20`. It returns `five_hour` / `seven_day` with `utilization` (0-100) and `resets_at`. This is undocumented.
    - Token sources: `CLAUDE_CODE_OAUTH_TOKEN`, the macOS Keychain (`Claude Code-credentials`, plus `-<first 8 hex of sha256(dir)>` for non-default dirs; this naming is a best guess), or `<dir>/.credentials.json` (`claudeAiOauth.accessToken`, `expiresAt` in ms).
    - Expired tokens are skipped. On HTTP 429 it backs off 15 minutes.
 3. **Status line.** Claude Code pipes `rate_limits.five_hour/seven_day` (`used_percentage`, `resets_at` as epoch seconds or ISO) to the status-line command, for Pro/Max only and after the first response. **The VS Code extension does not run status-line commands**, which is why sources 1 and 2 exist. Some CLI versions have shipped without `rate_limits`.
 
 **Hooks do fire in the VS Code extension** (recent versions) and receive `session_id`, `transcript_path`, `cwd` and `hook_event_name`, but **no `rate_limits`**. So the hook only triggers a check.
 
-**Throttling:** state files live in `<cache>/ccmeter/limits/<hash>.state.json` (`last_attempt`, `next_allowed`, `last_error`, `last_ok`) with a `<hash>.lock` (stale after 60s). There is a minimum 5-minute gap per account for hook and table checks. The scheduler uses its own intervals but the same state and lock. `CCMETER_LIMITS_SOURCE=cli|endpoint` restricts the source.
+**Throttling:** state files live in `<cache>/ccmeter/limits/<hash>.state.json` (`last_attempt`, `next_allowed`, `last_error`, `last_ok`) with a `<hash>.lock` (stale after 60s). There is a minimum 5-minute gap per account for hook and table checks. The scheduler uses its own intervals but the same state and lock. `CCMETER_LIMITS_SOURCE` picks the source: unset or `cli` (default), `auto`, or `endpoint`.
 
 **Triggers:** `serve` scheduler, the dashboard Refresh button, table/json (stale only), hooks (SessionStart and Stop) and `ccmeter limits`.
 
@@ -127,7 +127,7 @@ Dollar figures are estimates from local logs. The real plan percentages come fro
 | `CLAUDE_CONFIG_DIR` | Account auto-detection (comma separated) and account selection in statusline/hook |
 | `CCMETER_CLAUDE_BIN` | Path to the `claude` CLI if it isn't on PATH (common for background services and GUI-launched VS Code) |
 | `CCMETER_BIN` | Path to `ccmeter` for the plugin's hook script |
-| `CCMETER_LIMITS_SOURCE` | `cli` or `endpoint`, to use only one plan-limit source |
+| `CCMETER_LIMITS_SOURCE` | Plan-limit source: `cli` (default), `auto` (CLI, then the opt-in endpoint) or `endpoint` |
 | `CCMETER_USAGE_URL` | Override the usage endpoint (tests only) |
 | `CCMETER_IN_FETCH` | Set on ccmeter's own `claude` child so its hooks are ignored |
 
@@ -153,7 +153,7 @@ Dollar figures are estimates from local logs. The real plan percentages come fro
 ## Open items and ideas
 
 - `version` in main.go and the plugin are both `0.2.0`; bump them together. Consider GitHub Releases with cross-compiled binaries (`make` output in `build/bin/`).
-- **Not yet verified on real machines:** macOS Keychain naming for non-default dirs in the endpoint fallback, the Windows plugin hook (runs via `sh`), systemd/launchd autostart (only the renderers are unit-tested; the Linux desktop-entry path was run for real), and real `claude -p /usage` from the background service's PATH.
+- **Not yet verified on real machines:** macOS Keychain naming for non-default dirs in the opt-in endpoint, the Windows plugin hook (runs via `sh`), systemd/launchd autostart (only the renderers are unit-tested; the Linux desktop-entry path was run for real), and real `claude -p /usage` from the background service's PATH.
 - **Idea:** a small VS Code extension showing `5h % · wk %` per account in the VS Code status bar, reading `/api/summary`.
 - **Idea:** surface the "Current week (Sonnet only)" line, which is currently ignored.
 - **Idea:** a dashboard button to run `hook install` / `statusline install` per account.

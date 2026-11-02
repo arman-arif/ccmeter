@@ -6,6 +6,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -93,5 +94,38 @@ func TestRefreshLimitsFromEndpoint(t *testing.T) {
 	os.WriteFile(filepath.Join(dir, ".credentials.json"), creds, 0o600)
 	if _, err := refreshLimits(dir, true); err == nil || !strings.Contains(err.Error(), "expired") || calls != 1 {
 		t.Errorf("expired token: err=%v calls=%d", err, calls)
+	}
+}
+
+// The usage endpoint reads the saved login token, so it only runs when
+// CCMETER_LIMITS_SOURCE asks for it.
+func TestEndpointIsOptIn(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("uses a shell script")
+	}
+	t.Setenv("XDG_CACHE_HOME", t.TempDir())
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("CLAUDE_CONFIG_DIR", "")
+	t.Setenv("CLAUDE_CODE_OAUTH_TOKEN", "tok")
+	script := filepath.Join(t.TempDir(), "claude")
+	os.WriteFile(script, []byte("#!/bin/sh\necho 'error: not logged in' >&2\nexit 1\n"), 0o755)
+	t.Setenv("CCMETER_CLAUDE_BIN", script)
+	calls := 0
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls++
+		w.Write([]byte(`{"five_hour":{"utilization":42,"resets_at":null},"seven_day":{"utilization":7,"resets_at":null}}`))
+	}))
+	defer srv.Close()
+	t.Setenv("CCMETER_USAGE_URL", srv.URL)
+
+	for _, mode := range []string{"", "cli"} {
+		t.Setenv("CCMETER_LIMITS_SOURCE", mode)
+		if _, _, _, err := fetchPlanLimits(t.TempDir(), time.Now()); err == nil || calls != 0 {
+			t.Errorf("mode %q: err=%v, endpoint calls=%d; want the CLI error and no endpoint call", mode, err, calls)
+		}
+	}
+	t.Setenv("CCMETER_LIMITS_SOURCE", "auto")
+	if five, _, src, err := fetchPlanLimits(t.TempDir(), time.Now()); err != nil || src != "usage-endpoint" || five.UsedPct != 42 || calls != 1 {
+		t.Errorf("auto: src=%q err=%v calls=%d; want the endpoint after the CLI fails", src, err, calls)
 	}
 }

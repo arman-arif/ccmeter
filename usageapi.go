@@ -17,7 +17,8 @@ import (
 )
 
 // Plan limits from the usage endpoint behind Claude Code's /usage screen.
-// This endpoint is undocumented and may change. ccmeter only ever reads the
+// Opt-in only (CCMETER_LIMITS_SOURCE=auto or =endpoint): it reads the
+// account's saved login token. This endpoint is undocumented and may change. ccmeter only ever reads the
 // account's saved login: it never refreshes or rewrites credentials, so it
 // can't interfere with Claude Code's own session. An expired token is
 // reported and skipped until Claude Code refreshes it.
@@ -261,9 +262,11 @@ func refreshLimits(dir string, force bool) (*PlanLimits, error) {
 	return loadLimits(dir, now), nil
 }
 
-// fetchPlanLimits tries `claude -p /usage` first (official, refreshes the
-// login itself), then the usage endpoint. CCMETER_LIMITS_SOURCE=cli or
-// =endpoint restricts it to one source.
+// fetchPlanLimits runs `claude -p /usage` (official, refreshes the login
+// itself). The usage endpoint needs the account's saved login token, which
+// Anthropic's usage policy reserves for Claude Code and its own apps, so it
+// is opt-in: CCMETER_LIMITS_SOURCE=auto tries the CLI and then the endpoint,
+// and =endpoint uses only the endpoint.
 func fetchPlanLimits(dir string, now time.Time) (five, seven *LimitWindow, source string, err error) {
 	mode := strings.ToLower(os.Getenv("CCMETER_LIMITS_SOURCE"))
 	var cliErr error
@@ -271,7 +274,7 @@ func fetchPlanLimits(dir string, now time.Time) (five, seven *LimitWindow, sourc
 		if five, seven, cliErr = claudeUsage(dir, now); cliErr == nil {
 			return five, seven, "claude-cli", nil
 		}
-		if mode == "cli" {
+		if mode != "auto" {
 			return nil, nil, "", cliErr
 		}
 	}

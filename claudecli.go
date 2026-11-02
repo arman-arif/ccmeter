@@ -23,8 +23,8 @@ import (
 //	Current week (all models): 8% used · resets Nov 2, 9am (Asia/Dhaka)
 //
 // Claude Code refreshes the account's login itself, so this works even when
-// the saved token has expired. It is ccmeter's first choice; the direct
-// usage endpoint is the fallback.
+// the saved token has expired. It is ccmeter's only source unless the
+// direct usage endpoint is turned on with CCMETER_LIMITS_SOURCE.
 
 const fetchGuardEnv = "CCMETER_IN_FETCH" // set on the child so its hooks don't recurse
 
