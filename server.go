@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 )
@@ -150,7 +151,38 @@ func serve(cfg Config, cfgPath string, pr *Pricer, addr string, every time.Durat
 		limitsNote = "scheduled plan limit checks off"
 	}
 	fmt.Printf("ccmeter dashboard on http://%s  (%d accounts, rescans every %s, %s)\n", addr, len(cfg.Accounts), every, limitsNote)
-	return http.ListenAndServe(addr, mux)
+	return http.ListenAndServe(addr, localOnly(addr, mux))
+}
+
+// localOnly blocks DNS rebinding: a website whose domain resolves to
+// 127.0.0.1 would otherwise reach this server as its own origin and could
+// read usage data or edit accounts. Browsers send that domain as Host, so
+// only IP addresses, localhost, this machine's name and the -addr host pass.
+func localOnly(addr string, next http.Handler) http.Handler {
+	allowed := map[string]bool{"localhost": true}
+	if h, _, err := net.SplitHostPort(addr); err == nil && h != "" {
+		allowed[strings.ToLower(h)] = true
+	}
+	if h, err := os.Hostname(); err == nil && h != "" {
+		h = strings.ToLower(h)
+		allowed[h], allowed[h+".local"] = true, true
+	}
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !allowedHost(r.Host, allowed) {
+			writeErr(w, http.StatusForbidden, fmt.Errorf("host %q not allowed: open the dashboard by IP address or localhost, or start it with -addr set to that name", r.Host))
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
+func allowedHost(host string, allowed map[string]bool) bool {
+	if h, _, err := net.SplitHostPort(host); err == nil {
+		host = h
+	}
+	host = strings.TrimSuffix(strings.ToLower(strings.Trim(host, "[]")), ".")
+	// Empty Host only comes from non-browser HTTP/1.0 clients.
+	return host == "" || net.ParseIP(host) != nil || allowed[host]
 }
 
 type accountView struct {

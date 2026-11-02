@@ -64,13 +64,13 @@ Global flag: `-config PATH`. Default: `$CCMETER_CONFIG`, else `<user config dir>
 | `usageapi.go` | **Opt-in source:** the undocumented endpoint behind `/usage`. Also the read-only credential reader, the fetch state file (throttle and backoff), the per-account lock, `refreshLimits` and `fetchPlanLimits` (CLI only by default; `auto` adds the endpoint as a fallback). |
 | `limitsched.go` | Scheduler inside `serve` (active accounts every `-limits-interval`, default 5m; idle accounts every 30m; one at a time). Manual refresh trigger. `refreshDueLimits` is used by table/json. |
 | `hook.go` | `ccmeter hook` (finds the account from `CLAUDE_CONFIG_DIR` or `<dir>/projects/...` in the transcript path, then spawns a detached `hook-fetch` when one is due), `limits`, and hook install/uninstall with settings.json merging. |
-| `server.go` | HTTP server. Hot-reloads the config while keeping scan state for unchanged dirs. API routes are listed below. Write routes only accept loopback requests from the dashboard's own origin (`sameMachine`); `-read-only` disables account edits. |
+| `server.go` | HTTP server. Hot-reloads the config while keeping scan state for unchanged dirs. API routes are listed below. Every request must name an IP, `localhost`, the machine's hostname or the `-addr` host in `Host` (`localOnly`, which blocks DNS rebinding). Write routes only accept loopback requests from the dashboard's own origin (`sameMachine`); `-read-only` disables account edits. |
 | `daemon.go` | start/stop/status, pid file, `/api/health` probing (stop only signals a pid the dashboard confirms), `ensureConfigFile`, `serveOpts`. |
 | `detach_unix.go` / `detach_windows.go` | Detaching the child process (setsid / DETACHED_PROCESS + CREATE_NO_WINDOW) and terminating it. |
 | `autostart.go` | Per-OS autostart. Renderers for the systemd unit, desktop entry, launchd plist and VBS, with careful quoting (unit-tested). |
 | `web/index.html` | The whole dashboard: vanilla JS and CSS, SVG icon sprite, light/dark theme toggle, totals tiles, account cards (plan bars or estimate block, period stats, 30-day bar chart, daily and model tables), Accounts dialog (collapsible add/edit form, inline delete confirmation). Polls `/api/summary` every 15s. |
 | `plugin/` and `.claude-plugin/marketplace.json` | Claude Code plugin (see below). |
-| `*_test.go` | Tests for autostart renderers, /usage parsing (real output fixture), the fake-CLI flow, hook routing, settings merge, endpoint fetch with throttle and expiry, the endpoint being opt-in, and the scheduler. |
+| `*_test.go` | Tests for autostart renderers, /usage parsing (real output fixture), the fake-CLI flow, hook routing, settings merge, endpoint fetch with throttle and expiry, the endpoint being opt-in, the dashboard's Host check, and the scheduler. |
 
 ### HTTP API (`server.go`)
 - `GET /api/summary`: the `Report` (all accounts and totals).

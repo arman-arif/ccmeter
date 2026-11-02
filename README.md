@@ -39,7 +39,7 @@ The first `add` or `remove` creates the config file and keeps any auto-detected 
 
 You can do the same from the dashboard: the **Accounts** button (or the pencil on a card) opens a panel to add, edit, rename or remove accounts and set their limits. Changes are saved to the same config file. A running dashboard also picks up edits made with the CLI or by hand within one rescan.
 
-Editing in the dashboard only works from the machine running it (loopback requests from the dashboard's own page). Start it with `ccmeter serve -read-only` to turn editing off entirely.
+Editing in the dashboard only works from the machine running it (loopback requests from the dashboard's own page). Start it with `ccmeter serve -read-only` to turn editing off entirely. To block DNS-rebinding attacks from websites, the dashboard only answers requests addressed to an IP address, `localhost` or this machine's name. If you reach it under another name, start it with `-addr thatname:7878`.
 
 Without a config file, ccmeter looks in `$CLAUDE_CONFIG_DIR` (comma separated), `~/.claude`, `~/.config/claude` and `~/.claude-*`.
 
