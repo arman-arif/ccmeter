@@ -18,14 +18,14 @@ func TestBuildRange(t *testing.T) {
 	today := startOfDay(now)
 	pr := newPricer(nil)
 	es := []Entry{
-		testEntry(today.AddDate(0, 0, -20).Add(9*time.Hour), "/old", "s0", 1000), // outside a 7-day range
-		testEntry(today.AddDate(0, 0, -6).Add(9*time.Hour), "/a", "s1", 1000),    // first day of the range
-		testEntry(today.AddDate(0, 0, -6).Add(10*time.Hour), "/a", "s1", 3000),
-		testEntry(today.Add(9*time.Hour), "/b", "s2", 500),
-		testEntry(today.Add(14*time.Hour), "/a", "s3", 2000), // inside the 5-hour window at 15:00
+		testEntry(today.AddDate(0, 0, -20).Add(9*time.Hour), "-old", "s0", 1000), // outside a 7-day range
+		testEntry(today.AddDate(0, 0, -6).Add(9*time.Hour), "-a", "s1", 1000),    // first day of the range
+		testEntry(today.AddDate(0, 0, -6).Add(10*time.Hour), "-a", "s1", 3000),
+		testEntry(today.Add(9*time.Hour), "-b", "s2", 500),
+		testEntry(today.Add(14*time.Hour), "-a", "s3", 2000), // inside the 5-hour window at 15:00
 	}
 
-	r := buildRange(es, pr, now, 7)
+	r := buildRange(es, map[string]string{"-a": "/a"}, pr, now, 7)
 
 	if len(r.Daily) != 7 || r.Daily[0].Date != r.From || r.Daily[6].Date != r.To {
 		t.Fatalf("daily series: %d days, %s to %s", len(r.Daily), r.From, r.To)
@@ -39,6 +39,12 @@ func TestBuildRange(t *testing.T) {
 
 	if len(r.Projects) != 2 || r.Projects[0].Path != "/a" || r.Projects[0].Sessions != 2 || r.Projects[0].Messages != 3 {
 		t.Errorf("projects: %+v", r.Projects)
+	}
+	if r.Projects[1].Path != "-b" {
+		t.Errorf("a project with no known path keeps its folder name: %+v", r.Projects[1])
+	}
+	if r.Sessions[0].Project != "/a" {
+		t.Errorf("sessions show the project's path: %+v", r.Sessions[0])
 	}
 	if r.SessionCount != 3 || r.Sessions[0].ID != "s3" || r.Sessions[2].ID != "s1" {
 		t.Errorf("sessions: %d, %+v", r.SessionCount, r.Sessions)

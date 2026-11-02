@@ -122,11 +122,18 @@ func rangeDays(s string) int {
 
 func buildDetail(a *Account, pr *Pricer, now time.Time, days int) AccountDetail {
 	s, es := summarizeEntries(a, pr, now)
-	return AccountDetail{Summary: s, Setup: readSetup(s.Dir), Range: buildRange(es, pr, now, days)}
+	return AccountDetail{Summary: s, Setup: readSetup(s.Dir), Range: buildRange(es, a.projectPaths(), pr, now, days)}
 }
 
-// buildRange breaks down entries, which must be sorted oldest first.
-func buildRange(es []Entry, pr *Pricer, now time.Time, days int) RangeDetail {
+// buildRange breaks down entries, which must be sorted oldest first. paths maps
+// an entry's project to its real path; projects without one show their folder name.
+func buildRange(es []Entry, paths map[string]string, pr *Pricer, now time.Time, days int) RangeDetail {
+	projectPath := func(project string) string {
+		if p := paths[project]; p != "" {
+			return p
+		}
+		return project
+	}
 	today := startOfDay(now.Local())
 	from := today.AddDate(0, 0, -(days - 1))
 	r := RangeDetail{Days: days, From: from.Format("2006-01-02"), To: today.Format("2006-01-02")}
@@ -168,7 +175,7 @@ func buildRange(es []Entry, pr *Pricer, now time.Time, days int) RangeDetail {
 
 		p := projects[e.Project]
 		if p == nil {
-			p = &projectAgg{row: ProjectRow{Path: e.Project}, sessions: map[string]bool{}}
+			p = &projectAgg{row: ProjectRow{Path: projectPath(e.Project)}, sessions: map[string]bool{}}
 			projects[e.Project] = p
 		}
 		p.row.add(e, c)
@@ -177,7 +184,7 @@ func buildRange(es []Entry, pr *Pricer, now time.Time, days int) RangeDetail {
 
 		ss := sessions[e.Session]
 		if ss == nil {
-			ss = &sessionAgg{row: SessionRow{ID: e.Session, Project: e.Project, Start: e.T}, models: map[string]bool{}}
+			ss = &sessionAgg{row: SessionRow{ID: e.Session, Project: projectPath(e.Project), Start: e.T}, models: map[string]bool{}}
 			sessions[e.Session] = ss
 		}
 		ss.row.add(e, c)

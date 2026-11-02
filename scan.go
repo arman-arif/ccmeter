@@ -23,7 +23,7 @@ type Entry struct {
 	CW1h  int64 // cache write, 1-hour TTL
 	CR    int64 // cache read
 
-	Project string // working directory, or the log folder's name in older logs
+	Project string // the log folder under projects/, one per folder a session started in
 	Session string // session id, or the log file's name in older logs
 }
 
@@ -45,12 +45,13 @@ type Account struct {
 	seen    map[string]struct{}
 	entries []Entry
 	strs    map[string]string // one copy of each model, project and session string
+	paths   map[string]string // log folder name -> the real path it stands for
 	found   bool
 	lastErr string
 }
 
 func newAccount(c AccountConfig) *Account {
-	return &Account{Cfg: c, files: map[string]*fileState{}, seen: map[string]struct{}{}, strs: map[string]string{}}
+	return &Account{Cfg: c, files: map[string]*fileState{}, seen: map[string]struct{}{}, strs: map[string]string{}, paths: map[string]string{}}
 }
 
 // intern keeps entries small: they repeat the same few strings many times.
@@ -62,9 +63,43 @@ func (a *Account) intern(s string) string {
 	return s
 }
 
-// logOrigin is what a log's location says about its lines, for lines that
-// don't carry cwd or sessionId themselves.
+// logOrigin is what a log's location says about its lines. The folder is what
+// identifies a project: a line's cwd follows every `cd` the session runs, so
+// grouping by cwd would split one project into many.
 type logOrigin struct{ project, session string }
+
+// projectSlug is how Claude Code names a project's log folder after its path.
+func projectSlug(path string) string {
+	return strings.Map(func(r rune) rune {
+		if r < 128 && (r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z' || r >= '0' && r <= '9') {
+			return r
+		}
+		return '-'
+	}, path)
+}
+
+// notePath remembers the path behind a log folder. A cwd that encodes to the
+// folder's name is the real one; until one turns up, the first cwd seen is the
+// best guess, since a session starts there.
+func (a *Account) notePath(project, cwd string) {
+	if cwd == "" || a.paths[project] == cwd {
+		return
+	}
+	if _, known := a.paths[project]; !known || projectSlug(cwd) == project {
+		a.paths[project] = cwd
+	}
+}
+
+// projectPaths returns a copy of the log folder -> path map.
+func (a *Account) projectPaths() map[string]string {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	out := make(map[string]string, len(a.paths))
+	for k, v := range a.paths {
+		out[k] = v
+	}
+	return out
+}
 
 func originOf(root, path string) logOrigin {
 	o := logOrigin{session: strings.TrimSuffix(filepath.Base(path), ".jsonl")}
@@ -203,15 +238,13 @@ func (a *Account) parseLine(line []byte, origin logOrigin, cutoff time.Time) {
 		a.seen[key] = struct{}{}
 	}
 	u := rl.Message.Usage
-	project, session := rl.Cwd, rl.SessionID
-	if project == "" {
-		project = origin.project
-	}
+	session := rl.SessionID
 	if session == "" {
 		session = origin.session
 	}
+	a.notePath(origin.project, rl.Cwd)
 	e := Entry{T: t, Model: a.intern(rl.Message.Model), In: u.InputTokens, Out: u.OutputTokens, CR: u.CacheRead,
-		Project: a.intern(project), Session: a.intern(session)}
+		Project: a.intern(origin.project), Session: a.intern(session)}
 	if u.CC != nil && (u.CC.E5m+u.CC.E1h) > 0 {
 		e.CW5, e.CW1h = u.CC.E5m, u.CC.E1h
 	} else {
