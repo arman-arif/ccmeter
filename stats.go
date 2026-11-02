@@ -47,9 +47,8 @@ type Period struct {
 }
 
 type DayPoint struct {
-	Date    string  `json:"date"`
-	Tokens  int64   `json:"tokens"`
-	CostUSD float64 `json:"cost_usd"`
+	Date string `json:"date"`
+	Totals
 }
 
 type ModelRow struct {
@@ -114,7 +113,24 @@ func splitBlocks(es []Entry, costs []float64) []blockSpan {
 	return out
 }
 
+// sortModels puts the most expensive first, with a fixed order for ties so
+// rows don't swap places between refreshes.
+func sortModels(rows []ModelRow) {
+	sort.Slice(rows, func(i, j int) bool {
+		if rows[i].CostUSD != rows[j].CostUSD {
+			return rows[i].CostUSD > rows[j].CostUSD
+		}
+		return rows[i].Model < rows[j].Model
+	})
+}
+
 func summarize(a *Account, pr *Pricer, now time.Time) Summary {
+	s, _ := summarizeEntries(a, pr, now)
+	return s
+}
+
+// summarizeEntries also returns the entries it used, oldest first.
+func summarizeEntries(a *Account, pr *Pricer, now time.Time) (Summary, []Entry) {
 	cfg, es, found, errStr, files := a.snapshot()
 	s := Summary{Name: cfg.Name, Dir: cfg.Dir, Found: found, Error: errStr, Files: files}
 	s.Plan = loadLimits(cfg.Dir, now)
@@ -154,8 +170,7 @@ func summarize(a *Account, pr *Pricer, now time.Time) Summary {
 				dp = &DayPoint{Date: key}
 				daily[key] = dp
 			}
-			dp.Tokens += e.Total()
-			dp.CostUSD += c
+			dp.add(e, c)
 			mr := models[e.Model]
 			if mr == nil {
 				mr = &ModelRow{Model: e.Model, Priced: ok}
@@ -180,7 +195,7 @@ func summarize(a *Account, pr *Pricer, now time.Time) Summary {
 	for _, m := range models {
 		s.Models = append(s.Models, *m)
 	}
-	sort.Slice(s.Models, func(i, j int) bool { return s.Models[i].CostUSD > s.Models[j].CostUSD })
+	sortModels(s.Models)
 	for m := range unpriced {
 		s.Unpriced = append(s.Unpriced, m)
 	}
@@ -226,7 +241,7 @@ func summarize(a *Account, pr *Pricer, now time.Time) Summary {
 		s.Week.LimitUSD = cfg.WeeklyLimitUSD
 		s.Week.Pct = 100 * s.Week.CostUSD / cfg.WeeklyLimitUSD
 	}
-	return s
+	return s, es
 }
 
 func addTotals(dst *Totals, src Totals) {

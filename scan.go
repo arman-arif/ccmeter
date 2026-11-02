@@ -22,6 +22,9 @@ type Entry struct {
 	CW5   int64 // cache write, 5-minute TTL
 	CW1h  int64 // cache write, 1-hour TTL
 	CR    int64 // cache read
+
+	Project string // working directory, or the log folder's name in older logs
+	Session string // session id, or the log file's name in older logs
 }
 
 func (e Entry) Total() int64 { return e.In + e.Out + e.CW5 + e.CW1h + e.CR }
@@ -41,18 +44,42 @@ type Account struct {
 	files   map[string]*fileState
 	seen    map[string]struct{}
 	entries []Entry
+	strs    map[string]string // one copy of each model, project and session string
 	found   bool
 	lastErr string
 }
 
 func newAccount(c AccountConfig) *Account {
-	return &Account{Cfg: c, files: map[string]*fileState{}, seen: map[string]struct{}{}}
+	return &Account{Cfg: c, files: map[string]*fileState{}, seen: map[string]struct{}{}, strs: map[string]string{}}
+}
+
+// intern keeps entries small: they repeat the same few strings many times.
+func (a *Account) intern(s string) string {
+	if v, ok := a.strs[s]; ok {
+		return v
+	}
+	a.strs[s] = s
+	return s
+}
+
+// logOrigin is what a log's location says about its lines, for lines that
+// don't carry cwd or sessionId themselves.
+type logOrigin struct{ project, session string }
+
+func originOf(root, path string) logOrigin {
+	o := logOrigin{session: strings.TrimSuffix(filepath.Base(path), ".jsonl")}
+	if rel, err := filepath.Rel(root, path); err == nil {
+		o.project, _, _ = strings.Cut(filepath.ToSlash(rel), "/")
+	}
+	return o
 }
 
 type rawLine struct {
 	Type      string `json:"type"`
 	Timestamp string `json:"timestamp"`
 	RequestID string `json:"requestId"`
+	Cwd       string `json:"cwd"`
+	SessionID string `json:"sessionId"`
 	Message   *struct {
 		ID    string `json:"id"`
 		Model string `json:"model"`
@@ -109,7 +136,7 @@ func (a *Account) Scan(cutoff time.Time) {
 		if info.Size() < fsState.off { // truncated or replaced
 			fsState.off = 0
 		}
-		a.readFrom(path, fsState, cutoff)
+		a.readFrom(path, originOf(root, path), fsState, cutoff)
 		fsState.size, fsState.mod = info.Size(), info.ModTime()
 		return nil
 	})
@@ -126,7 +153,7 @@ func (a *Account) Scan(cutoff time.Time) {
 	}
 }
 
-func (a *Account) readFrom(path string, st *fileState, cutoff time.Time) {
+func (a *Account) readFrom(path string, origin logOrigin, st *fileState, cutoff time.Time) {
 	f, err := os.Open(path)
 	if err != nil {
 		return
@@ -143,7 +170,7 @@ func (a *Account) readFrom(path string, st *fileState, cutoff time.Time) {
 		}
 		st.off += int64(len(line))
 		if bytes.Contains(line, usageMarker) {
-			a.parseLine(line, cutoff)
+			a.parseLine(line, origin, cutoff)
 		}
 		if err != nil {
 			break
@@ -151,7 +178,7 @@ func (a *Account) readFrom(path string, st *fileState, cutoff time.Time) {
 	}
 }
 
-func (a *Account) parseLine(line []byte, cutoff time.Time) {
+func (a *Account) parseLine(line []byte, origin logOrigin, cutoff time.Time) {
 	var rl rawLine
 	if json.Unmarshal(line, &rl) != nil {
 		return
@@ -176,7 +203,15 @@ func (a *Account) parseLine(line []byte, cutoff time.Time) {
 		a.seen[key] = struct{}{}
 	}
 	u := rl.Message.Usage
-	e := Entry{T: t, Model: rl.Message.Model, In: u.InputTokens, Out: u.OutputTokens, CR: u.CacheRead}
+	project, session := rl.Cwd, rl.SessionID
+	if project == "" {
+		project = origin.project
+	}
+	if session == "" {
+		session = origin.session
+	}
+	e := Entry{T: t, Model: a.intern(rl.Message.Model), In: u.InputTokens, Out: u.OutputTokens, CR: u.CacheRead,
+		Project: a.intern(project), Session: a.intern(session)}
 	if u.CC != nil && (u.CC.E5m+u.CC.E1h) > 0 {
 		e.CW5, e.CW1h = u.CC.E5m, u.CC.E1h
 	} else {
@@ -192,6 +227,13 @@ func (a *Account) snapshot() (AccountConfig, []Entry, bool, string, int) {
 	out := make([]Entry, len(a.entries))
 	copy(out, a.entries)
 	return a.Cfg, out, a.found, a.lastErr, len(a.files)
+}
+
+// name returns the account's current name.
+func (a *Account) name() string {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return a.Cfg.Name
 }
 
 // setConfig updates name and limits of an account whose dir is unchanged.
