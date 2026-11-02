@@ -62,7 +62,7 @@ To run Claude Code against a second account: `CLAUDE_CONFIG_DIR=~/.claude-work c
 ccmeter              # table: 5-hour window, today, 7 days, 30 days per account
 ccmeter -v           # plus a per-model breakdown
 ccmeter json         # raw data
-ccmeter serve        # dashboard on http://127.0.0.1:7878 (-addr, -interval, -read-only)
+ccmeter serve        # dashboard on http://127.0.0.1:7878 (-addr, -interval, -read-only, -limits-interval)
 ```
 
 ### Run in the background
@@ -91,6 +91,16 @@ ccmeter autostart disable  # remove and stop
 | Windows | `ccmeter.vbs` in your Startup folder | Starts hidden at logon, no admin rights needed. |
 
 Autostart records the binary's absolute path, so install ccmeter where it will stay (re-run `autostart enable` after moving it). If you have no config file yet, `start` and `autostart enable` create one from the accounts detected at that moment, because a background process doesn't see your shell's `CLAUDE_CONFIG_DIR`.
+
+### Keeping plan limits fresh
+
+ccmeter checks your real 5-hour and weekly limits on its own, using `claude -p /usage`, which is free (details below):
+
+- **The dashboard** (`serve`, `start`, autostart) checks accounts used in the last 5 hours every 5 minutes and idle accounts every 30 minutes, one at a time. Change it with `-limits-interval 10m`, or turn it off with `-limits-interval 0`. The Refresh button checks every account right away.
+- **`ccmeter`** (the table) and `ccmeter json` refresh any account whose last check is more than 5 minutes old before printing (`-no-refresh` to skip).
+- **The hook or plugin** (below) also checks right after you use an account, from any Claude Code surface.
+
+All three share one throttle and lock per account, so they never check the same account twice in a row.
 
 ### Real plan limits from any Claude Code surface (hook)
 

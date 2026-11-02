@@ -516,7 +516,22 @@ async function load() {
     $('#status').innerHTML = `${icon('alert')}<span>can't reach ccmeter</span>`;
   }
 }
-$('#refresh').onclick = () => loadAccounts().then(load);
+$('#refresh').onclick = async () => {
+  loadAccounts().then(load);
+  // Also ask for fresh plan limits, then reload once the checks have had time to run.
+  try {
+    const res = await fetch('/api/limits/refresh', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+    if (res.ok) {
+      $('#status').innerHTML = `${icon('refresh')}<span>checking plan limits</span>`;
+      let tries = 0;
+      const poll = setInterval(async () => {
+        tries++;
+        const st = await fetch('/api/limits/status', { cache: 'no-store' }).then(r => r.json()).catch(() => ({}));
+        if (!st.refreshing || tries > 30) { clearInterval(poll); load(); }
+      }, 1500);
+    }
+  } catch (e) {}
+};
 
 // ---- account management ---------------------------------------------------
 const dlg = $('#acct-dlg'), form = $('#acct-form');
