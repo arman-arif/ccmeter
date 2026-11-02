@@ -20,14 +20,14 @@ ccmeter is a Claude Code usage meter for **several accounts at once**. Each acco
 ## Build, run, test
 
 ```bash
-go build -o ccmeter .
-./ccmeter                 # table (refreshes stale plan limits first)
-./ccmeter serve           # dashboard on http://127.0.0.1:7878
-go test ./...
-# cross-compile
-CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 go build -trimpath -ldflags="-s -w" -o dist/ccmeter-macos-arm64 .
+make                      # cross-compiled bundle for all platforms in build/bin/, with SHA256SUMS
+make build                # build/bin/ccmeter for this machine
+make check                # gofmt, vet x3, tests, plugin validation (run before committing)
+make serve                # build, then dashboard on http://127.0.0.1:7878
+make install              # to /usr/local/bin; PREFIX=~/.local for no sudo
+./build/bin/ccmeter       # table (refreshes stale plan limits first)
 ```
-`dist/` and the `ccmeter` binary are gitignored.
+`build/`, `dist/` and a root `ccmeter` binary are gitignored. `gofmt` may not be on PATH; the Makefile uses `$(go env GOROOT)/bin/gofmt`.
 
 ## Commands (see `ccmeter help`)
 
@@ -152,7 +152,7 @@ Dollar figures are estimates from local logs. The real plan percentages come fro
 
 ## Open items and ideas
 
-- `version` in main.go and the plugin are both `0.2.0`; bump them together. Consider GitHub Releases with cross-compiled binaries (`dist/` builds).
+- `version` in main.go and the plugin are both `0.2.0`; bump them together. Consider GitHub Releases with cross-compiled binaries (`make` output in `build/bin/`).
 - **Not yet verified on real machines:** macOS Keychain naming for non-default dirs in the endpoint fallback, the Windows plugin hook (runs via `sh`), systemd/launchd autostart (only the renderers are unit-tested; the Linux desktop-entry path was run for real), and real `claude -p /usage` from the background service's PATH.
 - **Idea:** a small VS Code extension showing `5h % · wk %` per account in the VS Code status bar, reading `/api/summary`.
 - **Idea:** surface the "Current week (Sonnet only)" line, which is currently ignored.

@@ -13,11 +13,11 @@ go install github.com/arman-arif/ccmeter@latest   # installs to ~/go/bin
 Or build from a clone:
 
 ```bash
-go build -o ccmeter .
-sudo mv ccmeter /usr/local/bin/
+make build            # builds build/bin/ccmeter
+sudo make install     # copies it to /usr/local/bin (or: make install PREFIX=~/.local)
 ```
 
-Cross-compile: `GOOS=darwin GOARCH=arm64 go build -o ccmeter-macos .`
+`make` on its own cross-compiles for Linux, macOS and Windows (amd64 and arm64) into `build/bin/`, with a `SHA256SUMS` file. `make help` lists every target. Without make, `go build -o ccmeter .` works too.
 
 ## Set up accounts
 
