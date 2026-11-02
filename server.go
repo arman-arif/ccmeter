@@ -133,6 +133,17 @@ func serve(cfg Config, cfgPath string, pr *Pricer, addr string, every time.Durat
 	mux.HandleFunc("GET /api/accounts", func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, s.accountList(r))
 	})
+	mux.HandleFunc("GET /api/accounts/{name}", func(w http.ResponseWriter, r *http.Request) {
+		name := r.PathValue("name")
+		accts, pr := s.current()
+		for _, a := range accts {
+			if a.name() == name {
+				writeJSON(w, http.StatusOK, buildDetail(a, pr, time.Now(), rangeDays(r.URL.Query().Get("days"))))
+				return
+			}
+		}
+		writeErr(w, http.StatusNotFound, fmt.Errorf("no account named %q", name))
+	})
 	mux.HandleFunc("POST /api/limits/refresh", func(w http.ResponseWriter, r *http.Request) {
 		if err := s.sameMachine(r); err != nil {
 			writeErr(w, http.StatusForbidden, err)
