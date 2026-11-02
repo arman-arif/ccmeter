@@ -12,7 +12,7 @@ import (
 	"time"
 )
 
-var version = "0.1.0"
+var version = "0.2.0"
 
 // History kept in memory: 30 days for the dashboard plus slack for the 5h window.
 const historyWindow = 31 * 24 * time.Hour
