@@ -7,7 +7,13 @@ It's a single Go binary with no dependencies. It reads the session logs in each 
 ## Install
 
 ```bash
-go build -o ccmeter .          # or use a prebuilt binary from dist/
+go install github.com/arman-arif/ccmeter@latest   # installs to ~/go/bin
+```
+
+Or build from a clone:
+
+```bash
+go build -o ccmeter .
 sudo mv ccmeter /usr/local/bin/
 ```
 
