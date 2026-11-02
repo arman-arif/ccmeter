@@ -2,7 +2,7 @@
 
 A Claude Code usage meter for **several accounts at once**. ccmeter treats each config dir (the folder `CLAUDE_CONFIG_DIR` points at) as a separate account.
 
-It's a single Go binary with no dependencies. It reads the session logs in each account's `projects/**/*.jsonl` and estimates usage at API list prices. The web dashboard is built into the binary.
+It's a single Go binary with nothing else to install. It reads the session logs in each account's `projects/**/*.jsonl` and estimates usage at API list prices. The web dashboard is built into the binary.
 
 ccmeter is an unofficial, community project. It isn't made, endorsed or supported by Anthropic. "Claude" and "Claude Code" are Anthropic's trademarks.
 
@@ -20,6 +20,8 @@ sudo make install     # copies it to /usr/local/bin (or: make install PREFIX=~/.
 ```
 
 `make` on its own cross-compiles for Linux, macOS and Windows (amd64 and arm64) into `build/bin/`, with a `SHA256SUMS` file. `make help` lists every target. Without make, `go build -o ccmeter .` works too.
+
+None of this needs Node. The dashboard is a React app in `frontend/`, and its build is committed in `web/` and embedded in the binary. You only need Node to change the dashboard: run `make web` afterwards and commit `web/`. While working on it, `cd frontend && npm run dev` serves it with live reload against a dashboard running on the default address.
 
 ## Set up accounts
 
@@ -73,6 +75,10 @@ ccmeter --no-color   # plain text; color is also off when piped or with NO_COLOR
 ccmeter json         # raw data
 ccmeter serve        # dashboard on http://127.0.0.1:7878 (-addr, -interval, -read-only, -limits-interval)
 ```
+
+The dashboard's overview shows every account side by side. Each account also has its own page at `/accounts/<name>`, with its plan limits and current 5-hour window, usage by day, by weekday and hour and by token type, past 5-hour windows, models, projects, recent sessions, and whether hooks and the status line are set up. Choose 7 or 30 days and cost, tokens or responses at the top of the page. The choice is kept in the link.
+
+Anyone who can reach the dashboard can read this, including your project folder paths. It only listens on `127.0.0.1` unless you change `-addr`.
 
 ### Run in the background
 
