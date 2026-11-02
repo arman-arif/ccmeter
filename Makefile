@@ -8,7 +8,7 @@ BIN     := build/bin
 # os/arch pairs for `make bundle`. Darwin binaries are named "macos".
 PLATFORMS := linux/amd64 linux/arm64 darwin/amd64 darwin/arm64 windows/amd64 windows/arm64
 
-.PHONY: all bundle build test check fmt vet validate install uninstall serve clean help
+.PHONY: all bundle build web web-check test check fmt vet validate install uninstall serve clean help
 
 all: bundle
 
@@ -16,8 +16,9 @@ help:
 	@echo "make            same as make bundle"
 	@echo "make bundle     cross-compile $(VERSION) for every platform into $(BIN)/, with SHA256SUMS"
 	@echo "make build      build $(BIN)/$(BINARY) for this machine"
+	@echo "make web        rebuild the dashboard from frontend/ into web/ (needs Node; commit the result)"
 	@echo "make test       go test ./..."
-	@echo "make check      gofmt, vet (linux, darwin, windows), tests, plugin validation"
+	@echo "make check      gofmt, vet (linux, darwin, windows), tests, plugin validation, web build up to date"
 	@echo "make fmt        gofmt -w ."
 	@echo "make install    copy $(BIN)/$(BINARY) to $(PREFIX)/bin; run make build first (PREFIX=~/.local for no sudo)"
 	@echo "make uninstall  remove $(PREFIX)/bin/$(BINARY)"
@@ -45,6 +46,26 @@ build:
 	@mkdir -p $(BIN)
 	go build -trimpath -o $(BIN)/$(BINARY) .
 
+# Go embeds web/ and doesn't run npm, so web/ is committed: `go build` and
+# `go install` need no Node. Rebuild it after changing frontend/.
+web: frontend/node_modules
+	cd frontend && npm run build
+
+frontend/node_modules: frontend/package-lock.json
+	cd frontend && npm ci
+	@touch $@
+
+# Fails if web/ isn't what frontend/ builds to. Skipped when frontend's
+# packages aren't installed, so Go-only work doesn't need Node.
+web-check:
+	@if [ -d frontend/node_modules ]; then \
+		rm -rf build/web-check; \
+		(cd frontend && npx tsc --noEmit && npx vite build --logLevel warn --outDir ../build/web-check --emptyOutDir) && \
+		diff -r web build/web-check >/dev/null || { echo "web/ is out of date: run make web and commit it"; exit 1; }; \
+	else \
+		echo "frontend/node_modules not found, skipping the web build check"; \
+	fi
+
 test:
 	go test ./...
 
@@ -57,7 +78,7 @@ vet:
 	GOOS=windows go vet ./...
 
 # The checks to run before every commit.
-check: vet test validate
+check: vet test validate web-check
 	@out=$$($(GOFMT) -l .); if [ -n "$$out" ]; then echo "gofmt needed:"; echo "$$out"; exit 1; fi
 
 # Skipped when the claude CLI isn't installed.
@@ -75,7 +96,7 @@ install:
 		echo "$(BIN)/$(BINARY) not found. Run 'make build' first (without sudo), then 'sudo make install'."; \
 		exit 1; \
 	fi
-	@if [ -n "$$(find . -path ./build -prune -o \( -name '*.go' -o -path './web/*' \) -newer $(BIN)/$(BINARY) -print | head -1)" ]; then \
+	@if [ -n "$$(find . \( -path ./build -o -path ./frontend \) -prune -o \( -name '*.go' -o -path './web/*' \) -newer $(BIN)/$(BINARY) -print | head -1)" ]; then \
 		echo "warning: $(BIN)/$(BINARY) is older than the source; run 'make build' to update it"; \
 	fi
 	install -d $(DESTDIR)$(PREFIX)/bin

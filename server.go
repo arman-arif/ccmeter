@@ -121,7 +121,7 @@ func serve(cfg Config, cfgPath string, pr *Pricer, addr string, every time.Durat
 
 	mux := http.NewServeMux()
 	sub, _ := fs.Sub(webFS, "web")
-	mux.Handle("/", http.FileServer(http.FS(sub)))
+	mux.Handle("/", webHandler(sub))
 	mux.HandleFunc("GET /api/summary", func(w http.ResponseWriter, r *http.Request) {
 		accts, pr := s.current()
 		writeJSON(w, http.StatusOK, buildReport(accts, pr, time.Now()))
@@ -133,17 +133,7 @@ func serve(cfg Config, cfgPath string, pr *Pricer, addr string, every time.Durat
 	mux.HandleFunc("GET /api/accounts", func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, s.accountList(r))
 	})
-	mux.HandleFunc("GET /api/accounts/{name}", func(w http.ResponseWriter, r *http.Request) {
-		name := r.PathValue("name")
-		accts, pr := s.current()
-		for _, a := range accts {
-			if a.name() == name {
-				writeJSON(w, http.StatusOK, buildDetail(a, pr, time.Now(), rangeDays(r.URL.Query().Get("days"))))
-				return
-			}
-		}
-		writeErr(w, http.StatusNotFound, fmt.Errorf("no account named %q", name))
-	})
+	mux.HandleFunc("GET /api/accounts/{name}", s.handleDetail)
 	mux.HandleFunc("POST /api/limits/refresh", func(w http.ResponseWriter, r *http.Request) {
 		if err := s.sameMachine(r); err != nil {
 			writeErr(w, http.StatusForbidden, err)
@@ -163,6 +153,35 @@ func serve(cfg Config, cfgPath string, pr *Pricer, addr string, every time.Durat
 	}
 	fmt.Printf("ccmeter dashboard on http://%s  (%d accounts, rescans every %s, %s)\n", addr, len(cfg.Accounts), every, limitsNote)
 	return http.ListenAndServe(addr, localOnly(addr, mux))
+}
+
+// webHandler serves the built dashboard (frontend/, built into web/). Pages are
+// routed in the browser, so any path outside /assets/ gets index.html: that
+// keeps a reload or a saved link to /accounts/work working. Asset names contain
+// a hash of their content, so they can be cached for good, while index.html is
+// always checked so a new binary's page takes effect straight away.
+func webHandler(files fs.FS) http.Handler {
+	static := http.FileServer(http.FS(files))
+	index, err := fs.ReadFile(files, "index.html")
+	if err != nil {
+		panic("dashboard build missing from the binary: " + err.Error())
+	}
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case strings.HasPrefix(r.URL.Path, "/api/"):
+			writeErr(w, http.StatusNotFound, errors.New("no such API route, or the wrong method for it"))
+		case r.Method != http.MethodGet && r.Method != http.MethodHead:
+			w.Header().Set("Allow", "GET, HEAD")
+			writeErr(w, http.StatusMethodNotAllowed, errors.New("method not allowed"))
+		case strings.HasPrefix(r.URL.Path, "/assets/"):
+			w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
+			static.ServeHTTP(w, r)
+		default:
+			w.Header().Set("Content-Type", "text/html; charset=utf-8")
+			w.Header().Set("Cache-Control", "no-cache")
+			w.Write(index)
+		}
+	})
 }
 
 // localOnly blocks DNS rebinding: a website whose domain resolves to
@@ -238,6 +257,18 @@ func (s *server) sameMachine(r *http.Request) error {
 		return errors.New("cross-origin request refused")
 	}
 	return nil
+}
+
+func (s *server) handleDetail(w http.ResponseWriter, r *http.Request) {
+	name := r.PathValue("name")
+	accts, pr := s.current()
+	for _, a := range accts {
+		if a.name() == name {
+			writeJSON(w, http.StatusOK, buildDetail(a, pr, time.Now(), rangeDays(r.URL.Query().Get("days"))))
+			return
+		}
+	}
+	writeErr(w, http.StatusNotFound, fmt.Errorf("no account named %q", name))
 }
 
 type saveRequest struct {
