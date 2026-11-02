@@ -152,7 +152,6 @@ Dollar figures are estimates from local logs. The real plan percentages come fro
 
 ## Open items and ideas
 
-- **Module path mismatch:** `go.mod` says `github.com/ariful/ccmeter` but the repo is `github.com/arman-arif/ccmeter`, so `go install github.com/arman-arif/ccmeter@latest` fails. Fix by changing the module line (no internal imports depend on it).
 - `version` in main.go and the plugin are both `0.2.0`; bump them together. Consider GitHub Releases with cross-compiled binaries (`dist/` builds).
 - **Not yet verified on real machines:** macOS Keychain naming for non-default dirs in the endpoint fallback, the Windows plugin hook (runs via `sh`), systemd/launchd autostart (only the renderers are unit-tested; the Linux desktop-entry path was run for real), and real `claude -p /usage` from the background service's PATH.
 - **Idea:** a small VS Code extension showing `5h % · wk %` per account in the VS Code status bar, reading `/api/summary`.
