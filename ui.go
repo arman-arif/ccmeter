@@ -419,6 +419,9 @@ func printAccounts(w io.Writer, cfg Config, cfgPath string, fromFile bool) {
 	t := table{header: []string{"ACCOUNT", "DIR", "NOTES"}}
 	for _, a := range cfg.Accounts {
 		var notes []string
+		if info := readAccountInfo(a.Dir); info != nil && info.Plan != "" {
+			notes = append(notes, info.Plan)
+		}
 		if st, err := os.Stat(filepath.Join(expandHome(a.Dir), "projects")); err != nil || !st.IsDir() {
 			notes = append(notes, paint(styleYellow, "no projects/ folder"))
 		}

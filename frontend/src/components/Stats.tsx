@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import type { Period, Totals } from '../api';
+import type { AccountInfo, Period, Totals } from '../api';
 import { count, tok, usd } from '../format';
 import { Icon } from './Icon';
 
@@ -47,5 +47,19 @@ export function Section({ title, sub, children }: { title: string; sub?: ReactNo
       </div>
       {children}
     </section>
+  );
+}
+
+export function PlanTag({ info }: { info?: AccountInfo }) {
+  return info?.plan ? <span className="tag">{info.plan}</span> : null;
+}
+
+export function EmailLine({ info }: { info?: AccountInfo }) {
+  if (!info?.email) return null;
+  return (
+    <div className="dir email-line">
+      <Icon name="users" />
+      <span title={info.email}>{info.email}</span>
+    </div>
   );
 }

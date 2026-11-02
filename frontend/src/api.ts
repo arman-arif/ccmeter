@@ -55,6 +55,18 @@ export interface PlanLimits {
   models?: ModelLimit[];
 }
 
+export interface AccountInfo {
+  email?: string;
+  name?: string;
+  organization?: string;
+  plan?: string;
+  role?: string;
+  extra_usage: boolean;
+  account_created?: string;
+  subscription_since?: string;
+  profile_updated?: string;
+}
+
 export interface Summary {
   name: string;
   dir: string;
@@ -69,6 +81,7 @@ export interface Summary {
   daily: DayPoint[] | null;
   models: ModelRow[] | null;
   unpriced?: string[];
+  account?: AccountInfo;
   plan?: PlanLimits;
   plan_error?: string;
 }

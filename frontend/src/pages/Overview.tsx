@@ -1,6 +1,6 @@
 import type { Report, Summary } from '../api';
 import { BarChart } from '../components/BarChart';
-import { DirLine, PeriodStat, Tile } from '../components/Stats';
+import { DirLine, EmailLine, PeriodStat, PlanTag, Tile } from '../components/Stats';
 import { Icon } from '../components/Icon';
 import { BlockEstimate, hasPlan, PlanBars } from '../components/Limits';
 import { ago, longDate, shortDate, tok, usd } from '../format';
@@ -33,8 +33,10 @@ function AccountCard({ a, onEdit }: { a: Summary; onEdit?: (name: string) => voi
       <article className="card">
         <div className="card-head">
           {title}
+          <PlanTag info={a.account} />
           <EditButton name={a.name} onEdit={onEdit} />
         </div>
+        <EmailLine info={a.account} />
         <DirLine dir={a.dir} />
         <div className="note">
           <Icon name="alert" />
@@ -51,9 +53,11 @@ function AccountCard({ a, onEdit }: { a: Summary; onEdit?: (name: string) => voi
     <article className="card">
       <div className="card-head">
         {title}
+        <PlanTag info={a.account} />
         <span className="status">{a.last_activity ? 'active ' + ago(a.last_activity) : 'no recent activity'}</span>
         <EditButton name={a.name} onEdit={onEdit} />
       </div>
+      <EmailLine info={a.account} />
       <DirLine dir={a.dir} />
       {hasPlan(a.plan) ? (
         <PlanBars plan={a.plan} block={a.block} />

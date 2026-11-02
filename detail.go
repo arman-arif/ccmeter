@@ -122,6 +122,7 @@ func rangeDays(s string) int {
 
 func buildDetail(a *Account, pr *Pricer, now time.Time, days int) AccountDetail {
 	s, es := summarizeEntries(a, pr, now)
+	s.Account = readAccountInfo(s.Dir)
 	return AccountDetail{Summary: s, Setup: readSetup(s.Dir), Range: buildRange(es, a.projectPaths(), pr, now, days)}
 }
 

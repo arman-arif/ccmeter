@@ -66,8 +66,9 @@ Global flags: `-config PATH` (default `$CCMETER_CONFIG`, else `<user config dir>
 | `stats.go` | `summarize` builds the `Summary` for each account: the 5-hour block (starts at the hour of the first message, ends 5h later or after a 5h gap), burn rate, projection, % of the configured limit or of the 30-day peak block, today / rolling 7d / 30d, daily series, models, `Plan` (real limits) and `PlanError`. |
 | `detail.go` | `buildDetail` for the account page: the `Summary`, a `RangeDetail` for the last N calendar days (daily, models, projects, sessions, 5-hour windows, weekday/hour cells) and `AccountSetup` (hooks, plugin and status line yes/no from `settings.json`, plus the fetch state). |
 | `prices.go` | `buildPrices` for the Prices page: the models in the logs with the price each resolved to, the user's overrides and the built-in list. |
+| `accountinfo.go` | `readAccountInfo`: plan, email, name, organization and dates from the `oauthAccount` profile in `.claude.json` (for the default `~/.claude`, the file beside the folder, `~/.claude.json`, comes first). Only named fields are decoded, so no other part of that file can reach the API, and `.credentials.json` is never read for this. Filled in by `buildReport` and `buildDetail`, not `summarize`, because the status line must stay quick. |
 | `statusline.go` | `ccmeter statusline`: picks the account from `CLAUDE_CONFIG_DIR`, then the transcript path, then the first account. Saves `rate_limits` and prints one line. |
-| `limits.go` | Plan limit storage: `LimitWindow`, `PlanLimits`, `saveLimitWindows` / `loadLimits` (one file per config dir, keyed by a hash of the dir). Marks a window `Reset` once its reset time passes. Status-line install/uninstall. |
+| `limits.go` | Plan limit storage: `LimitWindow`, `ModelLimit` (a model's own weekly limit, such as Fable), `PlanLimits`, `saveLimitWindows` / `loadLimits` (one file per config dir, keyed by a hash of the dir). Marks a window `Reset` once its reset time passes. Status-line install/uninstall. |
 | `claudecli.go` | **Primary limits source:** runs `claude -p /usage --output-format json` per account and parses the text. |
 | `usageapi.go` | **Opt-in source:** the undocumented endpoint behind `/usage`. Also the read-only credential reader, the fetch state file (throttle and backoff), the per-account lock, `refreshLimits` and `fetchPlanLimits` (CLI only by default; `auto` adds the endpoint as a fallback). |
 | `limitsched.go` | Scheduler inside `serve` (active accounts every `-limits-interval`, default 5m; idle accounts every 30m; one at a time). Manual refresh trigger. `refreshDueLimits` is used by table/json. |
@@ -101,7 +102,8 @@ Dollar figures are estimates from local logs. The real plan percentages come fro
    Current session: 4% used · resets Nov 2, 10:30am (Asia/Dhaka)
    Current week (all models): 8% used · resets Nov 2, 9am (Asia/Dhaka)
    ```
-   - The parser (`parseUsageText`) maps "session" to the 5-hour window and "week (all models)" to weekly. It ignores other lines, such as Sonnet-only. Reset times are parsed with the named IANA zone; the year is inferred and a time-only value rolls to the next day.
+   - On a plan with a separate Fable limit (seen on Max 5x, Nov 2026, not on Pro) it also prints `Current week (Fable): 0% used · resets Nov 5, 8am (Asia/Dhaka)`, and after that a "What's contributing to your usage?" section that the parser skips.
+   - The parser (`parseUsageText`) maps "session" to the 5-hour window and "week (all models)" to weekly. Any other `Current week (X)` line becomes a `ModelLimit` named X, so a plan's model limits appear without code changes. Sources that can't report them (status line, endpoint) keep the last known ones. Reset times are parsed with the named IANA zone; the year is inferred and a time-only value rolls to the next day.
    - The check runs with `--no-session-persistence --strict-mcp-config --settings {"disableAllHooks":true}`, and retries with plain flags if the CLI rejects those.
    - Working dir is the ccmeter state dir. The child gets `CCMETER_IN_FETCH=1` so ccmeter's own hook doesn't recurse.
    - For the default `~/.claude` account, **`CLAUDE_CONFIG_DIR` is left unset**. Setting it, even to the default path, can change the macOS Keychain item name.
@@ -165,6 +167,7 @@ Dollar figures are estimates from local logs. The real plan percentages come fro
 8. ccmeter now refreshes limits by itself: the scheduler in `serve`, the Refresh button, and table/json refreshing stale data.
 9. Dashboard rebuilt in React (`frontend/`, built into a committed `web/`), with a page for each account: range and measure filters, daily chart, weekday/hour heatmap, token types, 5-hour window history, models, projects, sessions, setup status.
 10. Prices page (`/prices`), and the built-in prices brought up to date with the Claude 5 family: they had been charging newer models at older, higher prices.
+11. Separate weekly limits per model (Fable on Max), and an account section with plan, email and organization on each account.
 
 ## Open items and ideas
 
@@ -172,6 +175,5 @@ Dollar figures are estimates from local logs. The real plan percentages come fro
 - `version` in main.go and the plugin are both `0.2.0`; bump them together. Consider GitHub Releases with cross-compiled binaries (`make` output in `build/bin/`).
 - **Not yet verified on real machines:** macOS Keychain naming for non-default dirs in the opt-in endpoint, the Windows plugin hook (runs via `sh`), systemd/launchd autostart (only the renderers are unit-tested; the Linux desktop-entry path was run for real), and real `claude -p /usage` from the background service's PATH.
 - **Idea:** a small VS Code extension showing `5h % · wk %` per account in the VS Code status bar, reading `/api/summary`.
-- **Idea:** surface the "Current week (Sonnet only)" line, which is currently ignored.
 - **Idea:** a dashboard button to run `hook install` / `statusline install` per account.
 - The 7-day tile is rolling (exact 168 hours, matching the weekly limit) while the 7-day filter is 7 whole calendar days, so they can differ. The filter row prints its dates to make that clear.

@@ -1,12 +1,12 @@
 import type { ReactNode } from 'react';
-import type { AccountDetail, BlockRow, DayPoint, HourCell, ModelRow, ProjectRow, RangeDetail, SessionRow, Totals } from '../api';
+import type { AccountDetail, AccountInfo, BlockRow, DayPoint, HourCell, ModelRow, ProjectRow, RangeDetail, SessionRow, Totals } from '../api';
 import { BarChart } from '../components/BarChart';
 import { Heatmap, hourLabel, WEEKDAYS } from '../components/Heatmap';
 import { Icon } from '../components/Icon';
 import { BlockEstimate, hasPlan, PlanBars, planSource } from '../components/Limits';
-import { DirLine, Section, Tile } from '../components/Stats';
+import { DirLine, EmailLine, PlanTag, Section, Tile } from '../components/Stats';
 import { Segmented, Table, TableView, type Column } from '../components/Table';
-import { ago, baseName, count, dateTime, hasTime, hhmm, longDate, percent, shortDate, shortDay, shortModel, tok, usd } from '../format';
+import { ago, baseName, count, dateTime, fullDay, hasTime, hhmm, longDate, percent, shortDate, shortDay, shortModel, tok, usd } from '../format';
 import { usePoll, useTitle } from '../hooks';
 import { Link, navigate, useUrl } from '../router';
 import { NotFound } from './NotFound';
@@ -302,6 +302,37 @@ function SetupRow({ k, children }: { k: string; children: ReactNode }) {
   );
 }
 
+function AccountSection({ info }: { info?: AccountInfo }) {
+  if (!info) {
+    return (
+      <Section title="Account">
+        <div className="section-sub">
+          No Claude login found in this config dir. That's expected with an API key, or before the first sign-in.
+        </div>
+      </Section>
+    );
+  }
+  return (
+    <Section title="Account" sub="from the profile Claude Code saved in this config dir">
+      <div className="setup">
+        <dl>
+          {info.plan && <SetupRow k="Plan">{info.plan}</SetupRow>}
+          {info.email && <SetupRow k="Email">{info.email}</SetupRow>}
+          {info.name && <SetupRow k="Name">{info.name}</SetupRow>}
+          {info.organization && <SetupRow k="Organization">{info.organization}</SetupRow>}
+          {info.role && <SetupRow k="Role"><span className="capitalize">{info.role}</span></SetupRow>}
+        </dl>
+        <dl>
+          <SetupRow k="Extra usage">{info.extra_usage ? 'On' : 'Off'}</SetupRow>
+          {info.subscription_since && <SetupRow k="Subscribed since">{fullDay(info.subscription_since)}</SetupRow>}
+          {info.account_created && <SetupRow k="Account created">{fullDay(info.account_created)}</SetupRow>}
+          {info.profile_updated && <SetupRow k="Profile last updated">{ago(info.profile_updated)}</SetupRow>}
+        </dl>
+      </div>
+    </Section>
+  );
+}
+
 function SetupSection({ a }: { a: AccountDetail }) {
   const s = a.setup;
   const arg = /\s/.test(a.name) ? `"${a.name}"` : a.name;
@@ -425,6 +456,7 @@ export function Account({ name, tick, onEdit }: { name: string; tick: number; on
       <div className="acct-head">
         <div className="card-head">
           <h2>{a.name}</h2>
+          <PlanTag info={a.account} />
           <span className="status">{a.last_activity ? 'active ' + ago(a.last_activity) : 'no recent activity'}</span>
           {onEdit && (
             <button className="btn edit" type="button" onClick={() => onEdit(a.name)}>
@@ -433,6 +465,7 @@ export function Account({ name, tick, onEdit }: { name: string; tick: number; on
             </button>
           )}
         </div>
+        <EmailLine info={a.account} />
         <DirLine dir={a.dir} />
       </div>
 
@@ -447,6 +480,7 @@ export function Account({ name, tick, onEdit }: { name: string; tick: number; on
               </span>
             </div>
           </div>
+          <AccountSection info={a.account} />
           <SetupSection a={a} />
         </>
       ) : (
@@ -503,6 +537,7 @@ export function Account({ name, tick, onEdit }: { name: string; tick: number; on
               </div>
             )}
           </div>
+          <AccountSection info={a.account} />
           <SetupSection a={a} />
         </>
       )}

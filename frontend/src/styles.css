@@ -291,4 +291,8 @@ table.mix td { border-bottom: 0; padding: 7px 6px; white-space: nowrap; }
 .config-sample code { padding: 0; background: none; border: 0; font: inherit; color: inherit; }
 .missing-price { display: inline-flex; align-items: center; gap: 5px; color: var(--warn-ink); }
 .missing-price .icon { width: 13px; height: 13px; }
+
 .plan-row { flex-wrap: wrap; row-gap: 2px; }
+.dir.email-line { margin-bottom: 2px; }
+.capitalize { text-transform: capitalize; }
+.card-head .tag { margin-left: 0; align-self: center; white-space: nowrap; }

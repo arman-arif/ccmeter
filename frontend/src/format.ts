@@ -67,6 +67,9 @@ export const dateTime = (t: string) =>
 // The local day of a full timestamp.
 export const shortDay = (t: string) => new Date(t).toLocaleDateString([], { month: 'short', day: 'numeric' });
 
+// The local date of a full timestamp, with its year.
+export const fullDay = (t: string) => new Date(t).toLocaleDateString([], { year: 'numeric', month: 'short', day: 'numeric' });
+
 export const percent = (part: number, whole: number) => (whole > 0 ? Math.round((100 * part) / whole) + '%' : '0%');
 
 // The last folder of a path, on any OS. Log folder names have no separators

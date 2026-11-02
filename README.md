@@ -76,9 +76,9 @@ ccmeter json         # raw data
 ccmeter serve        # dashboard on http://127.0.0.1:7878 (-addr, -interval, -read-only, -limits-interval)
 ```
 
-The dashboard's overview shows every account side by side. Each account also has its own page at `/accounts/<name>`, with its plan limits and current 5-hour window, usage by day, by weekday and hour and by token type, past 5-hour windows, models, projects, recent sessions, and whether hooks and the status line are set up. Choose 7 or 30 days and cost, tokens or responses at the top of the page. The choice is kept in the link. The Prices page at `/prices` shows the price each of your models is charged at, your overrides and the built-in list.
+The dashboard's overview shows every account side by side. Each account also has its own page at `/accounts/<name>`, with its plan, email and organization, its plan limits and current 5-hour window, usage by day, by weekday and hour and by token type, past 5-hour windows, models, projects, recent sessions, and whether hooks and the status line are set up. Choose 7 or 30 days and cost, tokens or responses at the top of the page. The choice is kept in the link. The Prices page at `/prices` shows the price each of your models is charged at, your overrides and the built-in list.
 
-Anyone who can reach the dashboard can read this, including your project folder paths. It only listens on `127.0.0.1` unless you change `-addr`.
+Anyone who can reach the dashboard can read this, including your project folder paths and each account's email and organization. It only listens on `127.0.0.1` unless you change `-addr`.
 
 ### Run in the background
 
@@ -109,7 +109,7 @@ Autostart records the binary's absolute path, so install ccmeter where it will s
 
 ### Keeping plan limits fresh
 
-ccmeter checks your real 5-hour and weekly limits on its own, using `claude -p /usage`, which is free (details below):
+ccmeter checks your real 5-hour and weekly limits on its own, along with any separate weekly limit your plan has for one model, such as Fable on Max. It uses `claude -p /usage`, which is free (details below):
 
 - **The dashboard** (`serve`, `start`, autostart) checks accounts used in the last 5 hours every 5 minutes and idle accounts every 30 minutes, one at a time. Change it with `-limits-interval 10m`, or turn it off with `-limits-interval 0`. The Refresh button checks every account right away.
 - **`ccmeter`** (the table) and `ccmeter json` refresh any account whose last check is more than 5 minutes old before printing (`-no-refresh` to skip).

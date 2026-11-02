@@ -58,21 +58,22 @@ type ModelRow struct {
 }
 
 type Summary struct {
-	Name         string      `json:"name"`
-	Dir          string      `json:"dir"`
-	Found        bool        `json:"found"`
-	Error        string      `json:"error,omitempty"`
-	Files        int         `json:"files"`
-	LastActivity *time.Time  `json:"last_activity,omitempty"`
-	Block        Block       `json:"block"`
-	Today        Period      `json:"today"`
-	Week         Period      `json:"week"`  // rolling 7 days
-	Month        Period      `json:"month"` // rolling 30 days
-	Daily        []DayPoint  `json:"daily"` // last 30 days, oldest first
-	Models       []ModelRow  `json:"models"`
-	Unpriced     []string    `json:"unpriced,omitempty"`
-	Plan         *PlanLimits `json:"plan,omitempty"`       // real plan limits
-	PlanError    string      `json:"plan_error,omitempty"` // last fetch problem, if recent
+	Name         string       `json:"name"`
+	Dir          string       `json:"dir"`
+	Found        bool         `json:"found"`
+	Error        string       `json:"error,omitempty"`
+	Files        int          `json:"files"`
+	LastActivity *time.Time   `json:"last_activity,omitempty"`
+	Block        Block        `json:"block"`
+	Today        Period       `json:"today"`
+	Week         Period       `json:"week"`  // rolling 7 days
+	Month        Period       `json:"month"` // rolling 30 days
+	Daily        []DayPoint   `json:"daily"` // last 30 days, oldest first
+	Models       []ModelRow   `json:"models"`
+	Unpriced     []string     `json:"unpriced,omitempty"`
+	Account      *AccountInfo `json:"account,omitempty"`    // left out of the status line, which must stay quick
+	Plan         *PlanLimits  `json:"plan,omitempty"`       // real plan limits
+	PlanError    string       `json:"plan_error,omitempty"` // last fetch problem, if recent
 }
 
 type Report struct {
@@ -258,6 +259,7 @@ func buildReport(accts []*Account, pr *Pricer, now time.Time) Report {
 	r := Report{GeneratedAt: now}
 	for _, a := range accts {
 		s := summarize(a, pr, now)
+		s.Account = readAccountInfo(s.Dir)
 		addTotals(&r.Total.Today, s.Today.Totals)
 		addTotals(&r.Total.Week, s.Week.Totals)
 		addTotals(&r.Total.Month, s.Month.Totals)
