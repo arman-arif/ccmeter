@@ -182,3 +182,7 @@ It prints something like `work · Opus · 5h: $3.18 (8%), 3h16m left · today $3
 ## Limits of the approach
 
 The numbers are estimates calculated from local logs. They are not the plan percentage that Claude Code's `/usage` shows, which comes from Anthropic's servers and weights models differently. Usage from claude.ai or other machines on the same account doesn't appear here either.
+
+## License
+
+MIT. See [LICENSE](LICENSE).

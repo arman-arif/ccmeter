@@ -158,4 +158,3 @@ Dollar figures are estimates from local logs. The real plan percentages come fro
 - **Idea:** a small VS Code extension showing `5h % · wk %` per account in the VS Code status bar, reading `/api/summary`.
 - **Idea:** surface the "Current week (Sonnet only)" line, which is currently ignored.
 - **Idea:** a dashboard button to run `hook install` / `statusline install` per account.
-- No LICENSE file yet, though plugin.json says MIT.
