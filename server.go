@@ -101,7 +101,7 @@ func (s *server) scan() {
 	wg.Wait()
 }
 
-func serve(cfg Config, cfgPath string, pr *Pricer, addr string, every time.Duration, readOnly bool) error {
+func serve(cfg Config, cfgPath string, pr *Pricer, addr string, every time.Duration, readOnly bool, limitsEvery time.Duration) error {
 	_, fromFile, _ := loadConfig(cfgPath)
 	s := &server{cfgPath: cfgPath, readOnly: readOnly, fromFile: fromFile, cfgMod: fileMod(cfgPath)}
 	s.applyLocked(cfg)
@@ -115,6 +115,8 @@ func serve(cfg Config, cfgPath string, pr *Pricer, addr string, every time.Durat
 			s.scan()
 		}
 	}()
+	sched := newLimitsScheduler(s, limitsEvery)
+	go sched.run()
 
 	mux := http.NewServeMux()
 	sub, _ := fs.Sub(webFS, "web")
@@ -130,10 +132,24 @@ func serve(cfg Config, cfgPath string, pr *Pricer, addr string, every time.Durat
 	mux.HandleFunc("GET /api/accounts", func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, s.accountList(r))
 	})
+	mux.HandleFunc("POST /api/limits/refresh", func(w http.ResponseWriter, r *http.Request) {
+		if err := s.sameMachine(r); err != nil {
+			writeErr(w, http.StatusForbidden, err)
+			return
+		}
+		writeJSON(w, http.StatusAccepted, map[string]bool{"started": sched.refreshNow()})
+	})
+	mux.HandleFunc("GET /api/limits/status", func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(w, http.StatusOK, map[string]any{"refreshing": sched.busy(), "interval": limitsEvery.String()})
+	})
 	mux.HandleFunc("POST /api/accounts", s.handleSave)
 	mux.HandleFunc("DELETE /api/accounts", s.handleDelete)
 
-	fmt.Printf("ccmeter dashboard on http://%s  (%d accounts, rescans every %s)\n", addr, len(cfg.Accounts), every)
+	limitsNote := "plan limits every " + limitsEvery.String() + " (idle accounts every " + idleLimitsInterval.String() + ")"
+	if limitsEvery <= 0 {
+		limitsNote = "scheduled plan limit checks off"
+	}
+	fmt.Printf("ccmeter dashboard on http://%s  (%d accounts, rescans every %s, %s)\n", addr, len(cfg.Accounts), every, limitsNote)
 	return http.ListenAndServe(addr, mux)
 }
 
@@ -166,6 +182,11 @@ func (s *server) canEdit(r *http.Request) error {
 	if s.readOnly {
 		return errors.New("the dashboard was started with -read-only")
 	}
+	return s.sameMachine(r)
+}
+
+// sameMachine accepts only loopback requests from the dashboard's own page.
+func (s *server) sameMachine(r *http.Request) error {
 	host, _, err := net.SplitHostPort(r.RemoteAddr)
 	if ip := net.ParseIP(host); err != nil || ip == nil || !ip.IsLoopback() {
 		return errors.New("accounts can only be changed from this machine")

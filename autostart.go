@@ -210,6 +210,9 @@ func startFlags(o serveOpts) []string {
 	if o.readOnly {
 		a = append(a, "-read-only")
 	}
+	if o.limitsEvery != defaultLimitsInterval {
+		a = append(a, "-limits-interval", o.limitsEvery.String())
+	}
 	return a
 }
 

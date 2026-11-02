@@ -20,10 +20,13 @@ const historyWindow = 31 * 24 * time.Hour
 const usage = `ccmeter - Claude Code usage meter for multiple accounts
 
 Usage:
-  ccmeter [table] [-v]           usage table for every account (default)
+  ccmeter [table] [-v]           usage table for every account (default);
+                                 refreshes stale plan limits first (-no-refresh)
   ccmeter json                   same data as JSON
   ccmeter serve [-addr ADDR]     web dashboard (default 127.0.0.1:7878);
-                                 -read-only turns off account editing
+                                 -read-only turns off account editing;
+                                 -limits-interval 5m sets how often plan
+                                 limits are checked in the background (0 = off)
   ccmeter statusline             one-line meter for Claude Code's status line;
                                  also records the real plan limits it reports
   ccmeter statusline install [NAME...] [--force]
@@ -168,11 +171,16 @@ func main() {
 	case "table":
 		fs := flag.NewFlagSet("table", flag.ExitOnError)
 		verbose := fs.Bool("v", false, "show per-model breakdown")
+		noRefresh := fs.Bool("no-refresh", false, "don't refresh stale plan limits first")
 		fs.Parse(rest)
 		accts := scanAll(cfg)
+		if !*noRefresh {
+			refreshDueLimits(accts)
+		}
 		printTable(buildReport(accts, pr, time.Now()), *verbose, len(cfg.Accounts) == 0)
 	case "json":
 		accts := scanAll(cfg)
+		refreshDueLimits(accts)
 		enc := json.NewEncoder(os.Stdout)
 		enc.SetIndent("", "  ")
 		enc.Encode(buildReport(accts, pr, time.Now()))
@@ -181,8 +189,9 @@ func main() {
 		addr := fs.String("addr", defaultAddr, "listen address")
 		every := fs.Duration("interval", 10*time.Second, "rescan interval")
 		readOnly := fs.Bool("read-only", false, "disable managing accounts from the dashboard")
+		limitsEvery := fs.Duration("limits-interval", defaultLimitsInterval, "how often to check plan limits for active accounts (0 = off)")
 		fs.Parse(rest)
-		if err := serve(cfg, cfgPath, pr, *addr, *every, *readOnly); err != nil {
+		if err := serve(cfg, cfgPath, pr, *addr, *every, *readOnly, *limitsEvery); err != nil {
 			fail(err)
 		}
 	case "hook":

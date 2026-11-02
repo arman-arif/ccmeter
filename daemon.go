@@ -56,9 +56,10 @@ func writePidFile(p pidFile) error {
 
 // serveOpts are the `serve` flags that start and autostart pass through.
 type serveOpts struct {
-	addr     string
-	interval time.Duration
-	readOnly bool
+	addr        string
+	interval    time.Duration
+	readOnly    bool
+	limitsEvery time.Duration
 }
 
 func (o serveOpts) args(cfgPath string) []string {
@@ -69,6 +70,9 @@ func (o serveOpts) args(cfgPath string) []string {
 	if o.readOnly {
 		a = append(a, "-read-only")
 	}
+	if o.limitsEvery != defaultLimitsInterval {
+		a = append(a, "-limits-interval", o.limitsEvery.String())
+	}
 	return a
 }
 
@@ -78,6 +82,7 @@ func parseServeOpts(name string, args []string) (serveOpts, *flag.FlagSet) {
 	fs.StringVar(&o.addr, "addr", defaultAddr, "listen address")
 	fs.DurationVar(&o.interval, "interval", 10*time.Second, "rescan interval")
 	fs.BoolVar(&o.readOnly, "read-only", false, "disable managing accounts from the dashboard")
+	fs.DurationVar(&o.limitsEvery, "limits-interval", defaultLimitsInterval, "how often to check plan limits (0 = off)")
 	fs.Parse(args)
 	return o, fs
 }
