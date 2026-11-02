@@ -137,7 +137,7 @@ export function Overview(props: { report?: Report; onEdit?: (name: string) => vo
         )}
       </section>
       <footer>
-        Costs are estimates at API list prices, read from each config dir's <code>projects/*.jsonl</code> logs. The 5-hour
+        Costs are estimates at <Link href="/prices">API list prices</Link>, read from each config dir's <code>projects/*.jsonl</code> logs. The 5-hour
         percentage is against <code>block_limit_usd</code> when set, otherwise against your own busiest window in the last 30
         days.
       </footer>

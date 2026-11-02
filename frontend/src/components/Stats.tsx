@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import type { Period, Totals } from '../api';
 import { count, tok, usd } from '../format';
 import { Icon } from './Icon';
@@ -34,5 +35,17 @@ export function DirLine({ dir }: { dir: string }) {
       <Icon name="folder" />
       <span>{dir}</span>
     </div>
+  );
+}
+
+export function Section({ title, sub, children }: { title: string; sub?: ReactNode; children: ReactNode }) {
+  return (
+    <section className="card section">
+      <div className="section-head">
+        <h3>{title}</h3>
+        {sub && <span className="section-sub">{sub}</span>}
+      </div>
+      {children}
+    </section>
   );
 }

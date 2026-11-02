@@ -27,10 +27,11 @@ export function useUrl(): URL {
   return new URL(href);
 }
 
-export type Route = { page: 'overview' } | { page: 'account'; name: string } | { page: 'missing' };
+export type Route = { page: 'overview' } | { page: 'prices' } | { page: 'account'; name: string } | { page: 'missing' };
 
 export function matchRoute(pathname: string): Route {
   if (pathname === '/') return { page: 'overview' };
+  if (pathname === '/prices' || pathname === '/prices/') return { page: 'prices' };
   const m = pathname.match(/^\/accounts\/([^/]+)\/?$/);
   if (m) {
     try {

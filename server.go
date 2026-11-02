@@ -134,6 +134,10 @@ func serve(cfg Config, cfgPath string, pr *Pricer, addr string, every time.Durat
 		writeJSON(w, http.StatusOK, s.accountList(r))
 	})
 	mux.HandleFunc("GET /api/accounts/{name}", s.handleDetail)
+	mux.HandleFunc("GET /api/prices", func(w http.ResponseWriter, r *http.Request) {
+		accts, pr := s.current()
+		writeJSON(w, http.StatusOK, buildPrices(buildReport(accts, pr, time.Now()).Accounts, pr, s.cfgPath))
+	})
 	mux.HandleFunc("POST /api/limits/refresh", func(w http.ResponseWriter, r *http.Request) {
 		if err := s.sameMachine(r); err != nil {
 			writeErr(w, http.StatusForbidden, err)

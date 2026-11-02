@@ -1,4 +1,4 @@
-// Types mirror the JSON from server.go, stats.go, limits.go and detail.go.
+// Types mirror the JSON from server.go, stats.go, limits.go, detail.go and prices.go.
 
 export interface Totals {
   input: number;
@@ -162,4 +162,37 @@ export interface AccountSetup {
 export interface AccountDetail extends Summary {
   setup: AccountSetup;
   range: RangeDetail;
+}
+
+export interface PriceView {
+  input: number;
+  output: number;
+  cache_write: number;
+  cache_write_1h: number;
+  cache_read: number;
+}
+
+export interface ListedPrice {
+  name: string;
+  price: PriceView;
+}
+
+export interface UsedPrice {
+  model: string;
+  source: '' | 'override' | 'builtin';
+  match?: string;
+  price?: PriceView;
+  accounts: string[];
+  messages: number;
+  tokens: number;
+  cost_usd: number;
+}
+
+export interface PricesReport {
+  checked_on: string;
+  source_url: string;
+  config_path: string;
+  used: UsedPrice[];
+  overrides: ListedPrice[];
+  builtin: ListedPrice[];
 }

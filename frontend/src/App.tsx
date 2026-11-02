@@ -6,6 +6,7 @@ import { usePoll } from './hooks';
 import { accountPath, Link, matchRoute, navigate, useUrl } from './router';
 import { Account } from './pages/Account';
 import { Overview } from './pages/Overview';
+import { Prices } from './pages/Prices';
 import { NotFound } from './pages/NotFound';
 
 type Theme = 'light' | 'dark';
@@ -127,7 +128,7 @@ export function App() {
         </button>
       </header>
 
-      <nav className="tabs" aria-label="Accounts">
+      <nav className="tabs" aria-label="Pages">
         <Link className="tab" href="/" aria-current={route.page === 'overview' ? 'page' : undefined}>
           Overview
         </Link>
@@ -142,9 +143,13 @@ export function App() {
             {a.name}
           </Link>
         ))}
+        <Link className="tab tab-end" href="/prices" aria-current={route.page === 'prices' ? 'page' : undefined}>
+          Prices
+        </Link>
       </nav>
 
       {route.page === 'overview' && <Overview report={summary.data} onEdit={onEdit} onAdd={() => openAccounts()} />}
+      {route.page === 'prices' && <Prices tick={tick} />}
       {route.page === 'account' && <Account key={route.name} name={route.name} tick={tick} onEdit={onEdit} />}
       {route.page === 'missing' && <NotFound what="That page doesn't exist." />}
 

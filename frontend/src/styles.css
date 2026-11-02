@@ -206,6 +206,7 @@ a.btn { text-decoration: none; }
 .tab { padding: 8px 12px; color: var(--text-secondary); text-decoration: none; font-size: 13px;
        border-bottom: 2px solid transparent; margin-bottom: -1px; max-width: 220px;
        overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.tab-end { margin-left: auto; }
 .tab:hover { color: var(--text-primary); }
 .tab[aria-current="page"] { color: var(--text-primary); border-bottom-color: var(--series-1); font-weight: 600; }
 .card-link { display: inline-flex; align-items: center; gap: 4px; margin-top: 12px; font-size: 13px; color: var(--text-secondary); text-decoration: none; }
@@ -278,3 +279,15 @@ table.mix td { border-bottom: 0; padding: 7px 6px; white-space: nowrap; }
 @media (max-width: 860px) {
   .now, .two, .setup { grid-template-columns: 1fr; }
 }
+
+/* Prices page */
+.page-intro { color: var(--text-secondary); font-size: 13px; margin: 0 0 16px; max-width: 72ch; }
+.page-intro h2 { margin: 0 0 6px; color: var(--text-primary); font-size: 18px; }
+.page-intro p { margin: 0; }
+.page-note { margin: 0 0 16px; }
+.section-foot { margin: 12px 0 0; }
+.config-sample { margin: 10px 0 0; padding: 10px 12px; overflow-x: auto; background: var(--surface-0); border: 1px solid var(--border);
+  border-radius: 8px; font: 12px ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--text-secondary); }
+.config-sample code { padding: 0; background: none; border: 0; font: inherit; color: inherit; }
+.missing-price { display: inline-flex; align-items: center; gap: 5px; color: var(--warn-ink); }
+.missing-price .icon { width: 13px; height: 13px; }

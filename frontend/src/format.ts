@@ -7,6 +7,13 @@ export function tok(n: number): string {
 
 export const usd = (v: number) => '$' + (v >= 100 ? v.toFixed(0) : v.toFixed(2));
 
+// A price per million tokens: at least cents, and as many as four decimals, as
+// some cache prices are fractions of a cent.
+export function rate(v: number): string {
+  const s = v.toFixed(4).replace(/0{1,2}$/, '');
+  return '$' + s;
+}
+
 export const count = (n: number) => n.toLocaleString();
 
 export const dur = (m: number) =>
@@ -39,6 +46,9 @@ const localDate = (d: string) => new Date(d + 'T00:00:00');
 
 export const longDate = (d: string) =>
   localDate(d).toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' });
+
+export const fullDate = (d: string) =>
+  localDate(d).toLocaleDateString([], { year: 'numeric', month: 'short', day: 'numeric' });
 
 export const shortDate = (d: string) =>
   localDate(d).toLocaleDateString([], { month: 'short', day: 'numeric' });

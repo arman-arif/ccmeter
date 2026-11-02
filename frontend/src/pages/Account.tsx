@@ -4,11 +4,11 @@ import { BarChart } from '../components/BarChart';
 import { Heatmap, hourLabel, WEEKDAYS } from '../components/Heatmap';
 import { Icon } from '../components/Icon';
 import { BlockEstimate, hasPlan, PlanBars, planSource } from '../components/Limits';
-import { DirLine, Tile } from '../components/Stats';
+import { DirLine, Section, Tile } from '../components/Stats';
 import { Segmented, Table, TableView, type Column } from '../components/Table';
 import { ago, baseName, count, dateTime, hasTime, hhmm, longDate, percent, shortDate, shortDay, shortModel, tok, usd } from '../format';
 import { usePoll, useTitle } from '../hooks';
-import { navigate, useUrl } from '../router';
+import { Link, navigate, useUrl } from '../router';
 import { NotFound } from './NotFound';
 
 type MetricKey = 'cost' | 'tokens' | 'responses';
@@ -33,18 +33,6 @@ function otherFigures(key: MetricKey, t: Totals): string {
   if (key !== 'tokens') parts.push(tok(t.tokens) + ' tokens');
   if (key !== 'responses') parts.push(count(t.messages) + ' responses');
   return '· ' + parts.join(' · ');
-}
-
-function Section({ title, sub, children }: { title: string; sub?: ReactNode; children: ReactNode }) {
-  return (
-    <section className="card section">
-      <div className="section-head">
-        <h3>{title}</h3>
-        {sub && <span className="section-sub">{sub}</span>}
-      </div>
-      {children}
-    </section>
-  );
 }
 
 const tokenColumns = <T extends Totals>(): Column<T>[] => [
@@ -226,7 +214,7 @@ function ModelsSection({ r }: { r: RangeDetail }) {
     { head: 'Share', cell: m => (m.priced ? percent(m.cost_usd, r.cost_usd) : '') },
   ];
   return (
-    <Section title="Models">
+    <Section title="Models" sub={<Link href="/prices">See prices</Link>}>
       <Table columns={columns} rows={r.models} rowKey={m => m.model} />
     </Section>
   );
@@ -518,7 +506,10 @@ export function Account({ name, tick, onEdit }: { name: string; tick: number; on
           <SetupSection a={a} />
         </>
       )}
-      <footer>Costs are estimates at API list prices, read from this config dir's logs. ccmeter looks back 30 days.</footer>
+      <footer>
+        Costs are estimates at <Link href="/prices">API list prices</Link>, read from this config dir's logs. ccmeter looks back 30
+        days.
+      </footer>
     </>
   );
 }

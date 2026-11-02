@@ -54,15 +54,15 @@ Without a config file, ccmeter looks in `$CLAUDE_CONFIG_DIR` (comma separated), 
     { "name": "work",     "dir": "~/.claude-work", "block_limit_usd": 40, "weekly_limit_usd": 600 }
   ],
   "pricing": {
-    "claude-fable": { "input": 10, "output": 50 }
+    "claude-example": { "input": 10, "output": 50 }
   }
 }
 ```
 
-The fable price above is a placeholder. Put in the real price for any model the meter reports as unpriced.
+The price above is an example. Use it for any model the meter reports as unpriced, or to change a built-in price.
 
 - `block_limit_usd` / `weekly_limit_usd` (optional): your limits, measured in equivalent API cost. Find them by watching where Claude Code stops you. If you don't set `block_limit_usd`, the 5-hour % is measured against your own busiest window in the last 30 days.
-- `pricing` (optional): USD per million tokens, matched against model names by substring (the longest match wins). Cache prices default to 1.25x input for 5-minute writes, 2x for 1-hour writes and 0.1x for reads. Built-in prices cover the Opus, Sonnet and Haiku families.
+- `pricing` (optional): USD per million tokens, matched against model names by substring (the longest match wins). Cache prices default to 1.25x input for 5-minute writes, 2x for 1-hour writes and 0.1x for reads. Built-in prices cover the Fable, Opus, Sonnet and Haiku families, and the dashboard's Prices page lists them with the date they were last checked.
 
 To run Claude Code against a second account: `CLAUDE_CONFIG_DIR=~/.claude-work claude` (log in once there).
 
@@ -76,7 +76,7 @@ ccmeter json         # raw data
 ccmeter serve        # dashboard on http://127.0.0.1:7878 (-addr, -interval, -read-only, -limits-interval)
 ```
 
-The dashboard's overview shows every account side by side. Each account also has its own page at `/accounts/<name>`, with its plan limits and current 5-hour window, usage by day, by weekday and hour and by token type, past 5-hour windows, models, projects, recent sessions, and whether hooks and the status line are set up. Choose 7 or 30 days and cost, tokens or responses at the top of the page. The choice is kept in the link.
+The dashboard's overview shows every account side by side. Each account also has its own page at `/accounts/<name>`, with its plan limits and current 5-hour window, usage by day, by weekday and hour and by token type, past 5-hour windows, models, projects, recent sessions, and whether hooks and the status line are set up. Choose 7 or 30 days and cost, tokens or responses at the top of the page. The choice is kept in the link. The Prices page at `/prices` shows the price each of your models is charged at, your overrides and the built-in list.
 
 Anyone who can reach the dashboard can read this, including your project folder paths. It only listens on `127.0.0.1` unless you change `-addr`.
 
