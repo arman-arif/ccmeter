@@ -245,7 +245,7 @@ func refreshLimits(dir string, force bool) (*PlanLimits, error) {
 	st.NextAllowed = time.Time{}
 	writeFetchState(dir, st)
 
-	five, seven, source, err := fetchPlanLimits(dir, now)
+	five, seven, models, source, err := fetchPlanLimits(dir, now)
 	if err != nil {
 		st.LastError = err.Error()
 		if errors.As(err, new(errRateLimited)) {
@@ -256,7 +256,7 @@ func refreshLimits(dir string, force bool) (*PlanLimits, error) {
 	}
 	st.LastError, st.LastOK = "", now
 	writeFetchState(dir, st)
-	if err := saveLimitWindows(dir, source, five, seven, now); err != nil {
+	if err := saveLimitWindows(dir, source, five, seven, models, now); err != nil {
 		return nil, err
 	}
 	return loadLimits(dir, now), nil
@@ -267,15 +267,15 @@ func refreshLimits(dir string, force bool) (*PlanLimits, error) {
 // Anthropic's usage policy reserves for Claude Code and its own apps, so it
 // is opt-in: CCMETER_LIMITS_SOURCE=auto tries the CLI and then the endpoint,
 // and =endpoint uses only the endpoint.
-func fetchPlanLimits(dir string, now time.Time) (five, seven *LimitWindow, source string, err error) {
+func fetchPlanLimits(dir string, now time.Time) (five, seven *LimitWindow, models []ModelLimit, source string, err error) {
 	mode := strings.ToLower(os.Getenv("CCMETER_LIMITS_SOURCE"))
 	var cliErr error
 	if mode != "endpoint" {
-		if five, seven, cliErr = claudeUsage(dir, now); cliErr == nil {
-			return five, seven, "claude-cli", nil
+		if five, seven, models, cliErr = claudeUsage(dir, now); cliErr == nil {
+			return five, seven, models, "claude-cli", nil
 		}
 		if mode != "auto" {
-			return nil, nil, "", cliErr
+			return nil, nil, nil, "", cliErr
 		}
 	}
 	c, err := readCreds(dir)
@@ -289,7 +289,7 @@ func fetchPlanLimits(dir string, now time.Time) (five, seven *LimitWindow, sourc
 		if cliErr != nil && !errors.As(err, new(errRateLimited)) {
 			err = fmt.Errorf("%v; usage endpoint: %w", cliErr, err)
 		}
-		return nil, nil, "", err
+		return nil, nil, nil, "", err
 	}
-	return five, seven, "usage-endpoint", nil
+	return five, seven, nil, "usage-endpoint", nil
 }

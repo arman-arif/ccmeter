@@ -120,12 +120,12 @@ func TestEndpointIsOptIn(t *testing.T) {
 
 	for _, mode := range []string{"", "cli"} {
 		t.Setenv("CCMETER_LIMITS_SOURCE", mode)
-		if _, _, _, err := fetchPlanLimits(t.TempDir(), time.Now()); err == nil || calls != 0 {
+		if _, _, _, _, err := fetchPlanLimits(t.TempDir(), time.Now()); err == nil || calls != 0 {
 			t.Errorf("mode %q: err=%v, endpoint calls=%d; want the CLI error and no endpoint call", mode, err, calls)
 		}
 	}
 	t.Setenv("CCMETER_LIMITS_SOURCE", "auto")
-	if five, _, src, err := fetchPlanLimits(t.TempDir(), time.Now()); err != nil || src != "usage-endpoint" || five.UsedPct != 42 || calls != 1 {
+	if five, _, _, src, err := fetchPlanLimits(t.TempDir(), time.Now()); err != nil || src != "usage-endpoint" || five.UsedPct != 42 || calls != 1 {
 		t.Errorf("auto: src=%q err=%v calls=%d; want the endpoint after the CLI fails", src, err, calls)
 	}
 }

@@ -21,6 +21,7 @@ import (
 //
 //	Current session: 4% used · resets Nov 2, 10:30am (Asia/Dhaka)
 //	Current week (all models): 8% used · resets Nov 2, 9am (Asia/Dhaka)
+//	Current week (Fable): 0% used · resets Nov 5, 8am (Asia/Dhaka)
 //
 // Claude Code refreshes the account's login itself, so this works even when
 // the saved token has expired. It is ccmeter's only source unless the
@@ -105,10 +106,10 @@ func runClaudeUsage(bin, dir string, args []string) (cliResult, error) {
 }
 
 // claudeUsage runs `claude -p /usage` for the account in dir and parses it.
-func claudeUsage(dir string, now time.Time) (*LimitWindow, *LimitWindow, error) {
+func claudeUsage(dir string, now time.Time) (*LimitWindow, *LimitWindow, []ModelLimit, error) {
 	bin, err := findClaude()
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 	base := []string{"-p", "/usage", "--output-format", "json"}
 	// Extra flags keep the check side-effect free: no saved session, no MCP
@@ -120,19 +121,19 @@ func claudeUsage(dir string, now time.Time) (*LimitWindow, *LimitWindow, error) 
 		r, err = runClaudeUsage(bin, dir, base)
 	}
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 	if r.IsError {
-		return nil, nil, fmt.Errorf("claude -p /usage reported an error: %s", firstLine(r.Result))
+		return nil, nil, nil, fmt.Errorf("claude -p /usage reported an error: %s", firstLine(r.Result))
 	}
 	if r.NumTurns > 0 || (r.LocalCommand != "" && r.LocalCommand != "usage") {
-		return nil, nil, errors.New("this claude version sent /usage to the model instead of handling it locally")
+		return nil, nil, nil, errors.New("this claude version sent /usage to the model instead of handling it locally")
 	}
-	five, seven := parseUsageText(r.Result, now)
+	five, seven, models := parseUsageText(r.Result, now)
 	if five == nil && seven == nil {
-		return nil, nil, fmt.Errorf("no plan limits in claude /usage output (%s)", firstLine(r.Result))
+		return nil, nil, nil, fmt.Errorf("no plan limits in claude /usage output (%s)", firstLine(r.Result))
 	}
-	return five, seven, nil
+	return five, seven, models, nil
 }
 
 func firstLine(s string) string {
@@ -149,12 +150,16 @@ func firstLine(s string) string {
 var (
 	usageLineRe = regexp.MustCompile(`(?i)^\s*([^:]+?)\s*:\s*(\d+(?:\.\d+)?)\s*%\s*used(?:\s*[·•|,-]\s*resets?\s+(.+?))?\s*$`)
 	resetRe     = regexp.MustCompile(`(?i)^(?:(?:on\s+)?([a-z]{3,9})\.?\s+(\d{1,2}),?\s*(?:at\s+)?)?(\d{1,2})(?::(\d{2}))?\s*(am|pm)?\s*(?:\(([^)]+)\))?\s*$`)
+	modelWeekRe = regexp.MustCompile(`\(\s*([^)]+?)(?i:\s+only)?\s*\)`)
 	months      = map[string]time.Month{"jan": 1, "feb": 2, "mar": 3, "apr": 4, "may": 5, "jun": 6, "jul": 7, "aug": 8, "sep": 9, "oct": 10, "nov": 11, "dec": 12}
 )
 
-// parseUsageText extracts the session (5-hour) and weekly (all models)
-// windows from /usage output. Other lines (e.g. Sonnet-only weeks) are ignored.
-func parseUsageText(text string, now time.Time) (five, seven *LimitWindow) {
+// parseUsageText extracts the session (5-hour) and weekly (all models) windows
+// from /usage output, and any weekly limits for one model, such as "Current week
+// (Fable)" or "Current week (Sonnet only)". models is never nil, so saving it
+// says this account has none rather than that the source doesn't know.
+func parseUsageText(text string, now time.Time) (five, seven *LimitWindow, models []ModelLimit) {
+	models = []ModelLimit{}
 	for _, line := range strings.Split(text, "\n") {
 		m := usageLineRe.FindStringSubmatch(line)
 		if m == nil {
@@ -171,12 +176,17 @@ func parseUsageText(text string, now time.Time) (five, seven *LimitWindow) {
 		switch {
 		case strings.Contains(label, "session") && five == nil:
 			five = w
-		case strings.Contains(label, "week") && seven == nil &&
-			(strings.Contains(label, "all") || !strings.Contains(label, "(")):
-			seven = w
+		case strings.Contains(label, "week") && (strings.Contains(label, "all") || !strings.Contains(label, "(")):
+			if seven == nil {
+				seven = w
+			}
+		case strings.Contains(label, "week"):
+			if name := modelWeekRe.FindStringSubmatch(m[1]); name != nil {
+				models = append(models, ModelLimit{Name: name[1], LimitWindow: *w})
+			}
 		}
 	}
-	return five, seven
+	return five, seven, models
 }
 
 // parseResetTime understands "Nov 2, 10:30am (Asia/Dhaka)", "9am (UTC)" and

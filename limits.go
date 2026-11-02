@@ -36,6 +36,14 @@ type PlanLimits struct {
 	AgeMin    int          `json:"age_min"`
 	FiveHour  *LimitWindow `json:"five_hour,omitempty"`
 	SevenDay  *LimitWindow `json:"seven_day,omitempty"`
+	Models    []ModelLimit `json:"models,omitempty"`
+}
+
+// ModelLimit is a weekly limit of its own for one model, such as Fable on a Max
+// plan. Only `claude /usage` reports these, and only on plans that have one.
+type ModelLimit struct {
+	Name string `json:"name"`
+	LimitWindow
 }
 
 // rawRateLimits mirrors the status-line JSON. resets_at has been sent both as
@@ -104,6 +112,7 @@ type savedLimits struct {
 	UpdatedAt time.Time    `json:"updated_at"`
 	FiveHour  *LimitWindow `json:"five_hour,omitempty"`
 	SevenDay  *LimitWindow `json:"seven_day,omitempty"`
+	Models    []ModelLimit `json:"models,omitempty"`
 }
 
 // saveLimits stores what Claude Code reported to the status line for dir.
@@ -111,17 +120,24 @@ func saveLimits(dir string, rl *rawRateLimits, now time.Time) error {
 	if rl == nil {
 		return nil
 	}
-	return saveLimitWindows(dir, "statusline", rl.FiveHour.toWindow(), rl.SevenDay.toWindow(), now)
+	return saveLimitWindows(dir, "statusline", rl.FiveHour.toWindow(), rl.SevenDay.toWindow(), nil, now)
 }
 
 // saveLimitWindows stores the latest plan windows for dir; the newest report
-// from any source wins.
-func saveLimitWindows(dir, source string, five, seven *LimitWindow, now time.Time) error {
-	s := savedLimits{Dir: dir, Source: source, UpdatedAt: now, FiveHour: five, SevenDay: seven}
+// from any source wins. nil models means the source can't report them, as with
+// the status line, so the last known ones stay. An empty list clears them.
+func saveLimitWindows(dir, source string, five, seven *LimitWindow, models []ModelLimit, now time.Time) error {
+	s := savedLimits{Dir: dir, Source: source, UpdatedAt: now, FiveHour: five, SevenDay: seven, Models: models}
 	if s.FiveHour == nil && s.SevenDay == nil {
 		return nil
 	}
 	path := limitsFile(dir)
+	if models == nil {
+		var prev savedLimits
+		if b, err := os.ReadFile(path); err == nil && json.Unmarshal(b, &prev) == nil {
+			s.Models = prev.Models
+		}
+	}
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return err
 	}
@@ -149,8 +165,12 @@ func loadLimits(dir string, now time.Time) *PlanLimits {
 		src = "statusline"
 	}
 	pl := &PlanLimits{Source: src, UpdatedAt: s.UpdatedAt,
-		AgeMin: int(now.Sub(s.UpdatedAt).Minutes()), FiveHour: s.FiveHour, SevenDay: s.SevenDay}
-	for _, w := range []*LimitWindow{pl.FiveHour, pl.SevenDay} {
+		AgeMin: int(now.Sub(s.UpdatedAt).Minutes()), FiveHour: s.FiveHour, SevenDay: s.SevenDay, Models: s.Models}
+	windows := []*LimitWindow{pl.FiveHour, pl.SevenDay}
+	for i := range pl.Models {
+		windows = append(windows, &pl.Models[i].LimitWindow)
+	}
+	for _, w := range windows {
 		if w != nil && !w.ResetsAt.IsZero() && now.After(w.ResetsAt) {
 			w.Reset = true
 		}

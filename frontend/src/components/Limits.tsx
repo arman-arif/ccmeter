@@ -88,6 +88,7 @@ export function PlanBars({ plan, block }: { plan: PlanLimits; block: Block }) {
     <>
       {plan.five_hour && <PlanWindow w={plan.five_hour} label="of 5-hour plan limit" icon="clock" estimate={estimate} />}
       {plan.seven_day && <PlanWindow w={plan.seven_day} label="of weekly plan limit" icon="calendar" />}
+      {plan.models?.map(m => <PlanWindow key={m.name} w={m} label={`of weekly ${m.name} limit`} icon="calendar" />)}
       <div className="plan-src">
         <Icon name="info" />
         {planSource(plan.source)}, updated{' '}

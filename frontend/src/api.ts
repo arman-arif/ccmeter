@@ -42,12 +42,17 @@ export interface LimitWindow {
   reset?: boolean;
 }
 
+export interface ModelLimit extends LimitWindow {
+  name: string;
+}
+
 export interface PlanLimits {
   source: string;
   updated_at: string;
   age_min: number;
   five_hour?: LimitWindow;
   seven_day?: LimitWindow;
+  models?: ModelLimit[];
 }
 
 export interface Summary {

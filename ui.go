@@ -287,6 +287,12 @@ func printTable(w io.Writer, r Report, verbose, none bool) {
 			costCell(r.Total.Month.CostUSD), tokCell(r.Total.Month.Tokens))
 	}
 	limits.render(w)
+	var names []string
+	var plans []*PlanLimits
+	for _, s := range r.Accounts {
+		names, plans = append(names, s.Name), append(plans, s.Plan)
+	}
+	printModelLimits(w, names, plans, now)
 	if len(costs.rows) > 0 {
 		fmt.Fprintln(w)
 		costs.render(w)
@@ -368,6 +374,7 @@ func printLimits(w io.Writer, names []string, plans []*PlanLimits, errs []error,
 		t.add(name, five, week, paint(styleDim, fmtDur(pl.AgeMin)+" ago, "+planSource(pl.Source)))
 	}
 	t.render(w)
+	printModelLimits(w, names, plans, now)
 	printed := false
 	for i, err := range errs {
 		if err == nil {
@@ -378,6 +385,24 @@ func printLimits(w io.Writer, names []string, plans []*PlanLimits, errs []error,
 			printed = true
 		}
 		warnLine(w, names[i], err.Error())
+	}
+}
+
+// printModelLimits lists the weekly limits for one model, such as Fable, on the
+// accounts that have one, and prints nothing when none do.
+func printModelLimits(w io.Writer, names []string, plans []*PlanLimits, now time.Time) {
+	t := table{header: []string{"ACCOUNT", "MODEL", "WEEK"}}
+	for i, pl := range plans {
+		if pl == nil {
+			continue
+		}
+		for j := range pl.Models {
+			t.add(names[i], pl.Models[j].Name, planMeter(&pl.Models[j].LimitWindow, now))
+		}
+	}
+	if len(t.rows) > 0 {
+		fmt.Fprintln(w)
+		t.render(w)
 	}
 }
 

@@ -164,12 +164,13 @@ func TestPrintTable(t *testing.T) {
 
 func TestPrintLimits(t *testing.T) {
 	now := time.Date(2026, 11, 2, 10, 0, 0, 0, time.Local)
-	pl := &PlanLimits{Source: "claude-cli", FiveHour: &LimitWindow{UsedPct: 24, ResetsAt: now.Add(time.Hour)}}
+	pl := &PlanLimits{Source: "claude-cli", FiveHour: &LimitWindow{UsedPct: 24, ResetsAt: now.Add(time.Hour)},
+		Models: []ModelLimit{{Name: "Fable", LimitWindow: LimitWindow{UsedPct: 62, ResetsAt: now.Add(time.Hour)}}}}
 	var b bytes.Buffer
 	printLimits(&b, []string{"default", "work"}, []*PlanLimits{nil, pl},
 		[]error{errors.New("boom"), nil}, now)
 	out := b.String()
-	for _, want := range []string{"no limits", "24%", "claude /usage", "warning: default: boom"} {
+	for _, want := range []string{"no limits", "24%", "claude /usage", "warning: default: boom", "MODEL", "Fable", "62%"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("missing %q in:\n%s", want, out)
 		}
