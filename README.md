@@ -4,6 +4,8 @@ A Claude Code usage meter for **several accounts at once**. ccmeter treats each 
 
 It's a single Go binary with no dependencies. It reads the session logs in each account's `projects/**/*.jsonl` and estimates usage at API list prices. The web dashboard is built into the binary.
 
+ccmeter is an unofficial, community project. It isn't made, endorsed or supported by Anthropic. "Claude" and "Claude Code" are Anthropic's trademarks.
+
 ## Install
 
 ```bash
@@ -183,6 +185,11 @@ It prints something like `work · Opus · 5h: $3.18 (8%), 3h16m left · today $3
 ## Limits of the approach
 
 The numbers are estimates calculated from local logs. They are not the plan percentage that Claude Code's `/usage` shows, which comes from Anthropic's servers and weights models differently. Usage from claude.ai or other machines on the same account doesn't appear here either.
+
+## Platform support
+
+- **Linux:** used day to day: the dashboard, background mode, desktop-entry autostart, hooks and `claude -p /usage`.
+- **macOS and Windows:** builds and unit tests cover them, but these parts haven't run on a real machine yet: LaunchAgent and Startup-folder autostart, the Keychain lookup (opt-in endpoint only), and the plugin's hook on Windows, which needs `sh` (for example from Git for Windows). Treat them as experimental, and please open an issue if something doesn't work.
 
 ## License
 
