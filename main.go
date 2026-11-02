@@ -6,9 +6,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
-	"path/filepath"
 	"strings"
-	"text/tabwriter"
 	"time"
 )
 
@@ -56,9 +54,11 @@ Background:
   ccmeter autostart status
   ccmeter version
 
-Global flag:
+Global flags:
   -config PATH                   config file (default: $CCMETER_CONFIG or
                                  <user config dir>/ccmeter/config.json)
+  --color, --no-color            force color on or off (default: on in a
+                                 terminal, off when piped or with $NO_COLOR)
 
 Accounts come from the config file. Without one, ccmeter looks at
 $CLAUDE_CONFIG_DIR, ~/.claude, ~/.config/claude and ~/.claude-*.
@@ -67,8 +67,9 @@ $CLAUDE_CONFIG_DIR, ~/.claude, ~/.config/claude and ~/.claude-*.
 func main() {
 	args := os.Args[1:]
 	cfgPath := configPath()
-	// Pull -config out of args wherever it appears.
+	// Pull -config and the color flags out of args wherever they appear.
 	var rest []string
+	forceColor := 0
 	for i := 0; i < len(args); i++ {
 		a := args[i]
 		switch {
@@ -79,10 +80,16 @@ func main() {
 			}
 		case strings.HasPrefix(a, "-config=") || strings.HasPrefix(a, "--config="):
 			cfgPath = expandHome(a[strings.Index(a, "=")+1:])
+		case a == "--color":
+			forceColor = 1
+		case a == "--no-color":
+			forceColor = -1
 		default:
 			rest = append(rest, a)
 		}
 	}
+	stdoutTTY = isTerminal(os.Stdout)
+	useColor = colorEnabled(forceColor, stdoutTTY, os.Getenv("NO_COLOR"), os.Getenv("TERM"), enableTerminalColor)
 	cmd := "table"
 	if len(rest) > 0 && !strings.HasPrefix(rest[0], "-") {
 		cmd, rest = rest[0], rest[1:]
@@ -150,24 +157,7 @@ func main() {
 
 	switch cmd {
 	case "accounts":
-		if fromFile {
-			fmt.Println("config:", cfgPath)
-		} else {
-			fmt.Println("config: none (auto-detected; run `ccmeter init` to create", cfgPath+")")
-		}
-		for _, a := range cfg.Accounts {
-			line := fmt.Sprintf("  %-16s %s", a.Name, a.Dir)
-			if st, err := os.Stat(filepath.Join(expandHome(a.Dir), "projects")); err != nil || !st.IsDir() {
-				line += "  (no projects/ folder)"
-			}
-			if a.BlockLimitUSD > 0 {
-				line += "  5h limit " + fmtUSD(a.BlockLimitUSD)
-			}
-			if a.WeeklyLimitUSD > 0 {
-				line += "  weekly limit " + fmtUSD(a.WeeklyLimitUSD)
-			}
-			fmt.Println(line)
-		}
+		printAccounts(os.Stdout, cfg, cfgPath, fromFile)
 	case "table":
 		fs := flag.NewFlagSet("table", flag.ExitOnError)
 		verbose := fs.Bool("v", false, "show per-model breakdown")
@@ -177,7 +167,7 @@ func main() {
 		if !*noRefresh {
 			refreshDueLimits(accts)
 		}
-		printTable(buildReport(accts, pr, time.Now()), *verbose, len(cfg.Accounts) == 0)
+		printTable(os.Stdout, buildReport(accts, pr, time.Now()), *verbose, len(cfg.Accounts) == 0)
 	case "json":
 		accts := scanAll(cfg)
 		refreshDueLimits(accts)
@@ -286,90 +276,4 @@ func blockCell(b Block) string {
 		s += fmt.Sprintf(" (%.0f%%%s)", b.Pct, tag)
 	}
 	return s + ", " + fmtDur(b.RemainingMin) + " left"
-}
-
-func periodCell(p Period) string {
-	s := fmtUSD(p.CostUSD) + " / " + fmtTok(p.Tokens)
-	if p.LimitUSD > 0 {
-		s += fmt.Sprintf(" (%.0f%%)", p.Pct)
-	}
-	return s
-}
-
-func printTable(r Report, verbose, none bool) {
-	if none {
-		fmt.Println("No Claude Code config dirs found. Run `ccmeter init` and edit the file, or set CLAUDE_CONFIG_DIR.")
-		return
-	}
-	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(w, "ACCOUNT\t5-HOUR WINDOW\tTODAY\t7 DAYS\t30 DAYS")
-	for _, s := range r.Accounts {
-		if !s.Found {
-			fmt.Fprintf(w, "%s\tnot found: %s\t\t\t\n", s.Name, s.Dir)
-			continue
-		}
-		five, week := blockCell(s.Block), periodCell(s.Week)
-		if pw := planWindow(s.Plan, true); pw != nil {
-			five = "plan " + planCell(pw)
-			if s.Block.Active {
-				five += ", " + fmtUSD(s.Block.CostUSD) + " est"
-			}
-		}
-		if pw := planWindow(s.Plan, false); pw != nil {
-			week += ", plan " + planCell(pw)
-		}
-		fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n", s.Name, five,
-			periodCell(s.Today), week, periodCell(s.Month))
-	}
-	if len(r.Accounts) > 1 {
-		fmt.Fprintf(w, "ALL\t\t%s\t%s\t%s\n",
-			fmtUSD(r.Total.Today.CostUSD)+" / "+fmtTok(r.Total.Today.Tokens),
-			fmtUSD(r.Total.Week.CostUSD)+" / "+fmtTok(r.Total.Week.Tokens),
-			fmtUSD(r.Total.Month.CostUSD)+" / "+fmtTok(r.Total.Month.Tokens))
-	}
-	w.Flush()
-
-	if verbose {
-		for _, s := range r.Accounts {
-			if !s.Found || len(s.Models) == 0 {
-				continue
-			}
-			fmt.Printf("\n%s - by model, 30 days\n", s.Name)
-			w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', tabwriter.AlignRight)
-			fmt.Fprintln(w, "MODEL\tINPUT\tOUTPUT\tCACHE WRITE\tCACHE READ\tCOST\t")
-			for _, m := range s.Models {
-				cost := fmtUSD(m.CostUSD)
-				if !m.Priced {
-					cost = "unpriced"
-				}
-				fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\t\n", m.Model, fmtTok(m.Input), fmtTok(m.Output),
-					fmtTok(m.CacheWrite), fmtTok(m.CacheRead), cost)
-			}
-			w.Flush()
-		}
-	}
-	for _, s := range r.Accounts {
-		if len(s.Unpriced) > 0 {
-			fmt.Printf("\nnote: %s has unpriced models (%s); add them under \"pricing\" in the config.\n",
-				s.Name, strings.Join(s.Unpriced, ", "))
-		}
-	}
-	var seen []string
-	for _, s := range r.Accounts {
-		if s.Plan != nil {
-			src := map[string]string{"usage-endpoint": "usage endpoint", "claude-cli": "claude /usage"}[s.Plan.Source]
-			if src == "" {
-				src = "status line"
-			}
-			seen = append(seen, fmt.Sprintf("%s %s ago (%s)", s.Name, fmtDur(s.Plan.AgeMin), src))
-		}
-	}
-	plan := len(seen) > 0
-	if plan {
-		fmt.Println("\nPlan limits updated: " + strings.Join(seen, ", "))
-	}
-	fmt.Println("\nCosts are estimates at API list prices; % is of your limit, or of your own 30-day peak window.")
-	if !plan {
-		fmt.Println("Run `ccmeter hook install` (or `ccmeter statusline install`) to also show your real plan limits.")
-	}
 }

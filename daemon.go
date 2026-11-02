@@ -288,11 +288,11 @@ func cmdStatus(args []string) {
 		if havePid && p.PID == h.PID {
 			how = "started with `ccmeter start`"
 		}
-		fmt.Printf("running:   yes, pid %d, %s\n           %s\n", h.PID, how, dashboardURL(addr))
+		fmt.Printf("running:   %s, pid %d, %s\n           %s\n", paint(styleGreen, "yes"), h.PID, how, dashboardURL(addr))
 		fmt.Printf("config:    %s\n", h.Config)
 		fmt.Printf("since:     %s\n", h.Started.Local().Format("2006-01-02 15:04"))
 	} else {
-		fmt.Printf("running:   no (nothing answering at %s)\n", dashboardURL(addr))
+		fmt.Printf("running:   %s (nothing answering at %s)\n", paint(styleYellow, "no"), dashboardURL(addr))
 	}
 	if havePid || fileExists(logPath()) {
 		fmt.Printf("log:       %s\n", logPath())

@@ -84,25 +84,24 @@ func cmdLimits(cfg Config, names []string) error {
 	if err != nil {
 		return err
 	}
+	labels := make([]string, len(targets))
+	plans := make([]*PlanLimits, len(targets))
+	errs := make([]error, len(targets))
 	failed := 0
-	for _, a := range targets {
-		pl, err := refreshLimits(a.Dir, true)
-		line := fmt.Sprintf("%-16s", a.Name)
-		if pl != nil {
-			if w := pl.FiveHour; w != nil {
-				line += " 5h " + planCell(w)
-			}
-			if w := pl.SevenDay; w != nil {
-				line += " · week " + planCell(w)
-			}
-			line += fmt.Sprintf("  [%s, %s ago]", pl.Source, fmtDur(pl.AgeMin))
+	for i, a := range targets {
+		if stdoutTTY {
+			fmt.Printf("\rchecking %s...\x1b[K", a.Name) // each check takes seconds
 		}
-		if err != nil {
-			line += "  error: " + err.Error()
+		labels[i] = a.Name
+		plans[i], errs[i] = refreshLimits(a.Dir, true)
+		if errs[i] != nil {
 			failed++
 		}
-		fmt.Println(line)
 	}
+	if stdoutTTY {
+		fmt.Print("\r\x1b[K")
+	}
+	printLimits(os.Stdout, labels, plans, errs, time.Now())
 	if failed > 0 {
 		return fmt.Errorf("%d account(s) without fresh limits", failed)
 	}

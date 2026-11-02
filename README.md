@@ -69,6 +69,7 @@ To run Claude Code against a second account: `CLAUDE_CONFIG_DIR=~/.claude-work c
 ```bash
 ccmeter              # table: 5-hour window, today, 7 days, 30 days per account
 ccmeter -v           # plus a per-model breakdown
+ccmeter --no-color   # plain text; color is also off when piped or with NO_COLOR
 ccmeter json         # raw data
 ccmeter serve        # dashboard on http://127.0.0.1:7878 (-addr, -interval, -read-only, -limits-interval)
 ```

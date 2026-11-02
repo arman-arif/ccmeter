@@ -46,13 +46,15 @@ make install              # copies build/bin/ccmeter to /usr/local/bin, never bu
 | `ccmeter limits [NAME...]` | Checks plan limits now and prints them. |
 | `ccmeter init / accounts / add NAME DIR / remove NAME\|DIR` | Account management. `add` accepts `--block-limit`, `--weekly-limit` (USD) and `--force`. |
 
-Global flag: `-config PATH`. Default: `$CCMETER_CONFIG`, else `<user config dir>/ccmeter/config.json`.
+Global flags: `-config PATH` (default `$CCMETER_CONFIG`, else `<user config dir>/ccmeter/config.json`); `--color` / `--no-color` (default: color on a terminal, off when piped, with `NO_COLOR` or `TERM=dumb`).
 
 ## Architecture (file map)
 
 | File | Responsibility |
 |---|---|
-| `main.go` | Argument parsing and dispatch, table printing, formatting helpers (`fmtTok`, `fmtUSD`, `fmtDur`, `blockCell`, `periodCell`). `version` constant. |
+| `main.go` | Argument parsing and dispatch, formatting helpers (`fmtTok`, `fmtUSD`, `fmtDur`, `blockCell`, used by the status line). `version` constant. |
+| `ui.go` | Terminal output: color detection, `table` (aligns cells that contain color codes, which text/tabwriter can't), usage meters, `printTable`, `printLimits`, `printAccounts`. Tables stay within 80 columns. Color is decoration only: alerts are also in words, so piped output and `NO_COLOR` lose nothing. Near-limit thresholds match the dashboard (80%, 100%). |
+| `term_unix.go` / `term_windows.go` | `enableTerminalColor` (turns on ANSI in the Windows console, plain text where unsupported). |
 | `config.go` | `Config`/`AccountConfig` (name, dir, `block_limit_usd`, `weekly_limit_usd`, `pricing` overrides), config path, auto-detection, `init`. |
 | `accounts.go` | Shared rules for adding, updating and removing accounts (`upsertAccount`, `removeAccount`, used by the CLI and the web API). `saveConfig` writes atomically. |
 | `pricing.go` | Built-in API list prices by model family (Opus 4.5+ $5/$25, Opus 4/4.1 $15/$75, Sonnet $3/$15, Haiku 4.5 $1/$5, ...). Cache write is 1.25x input (5-minute) or 2x (1-hour); cache read is 0.1x. Unknown models are reported as "unpriced" (e.g. Fable/Mythos: prices unknown, so the user adds them under `pricing`). |
@@ -124,6 +126,7 @@ Dollar figures are estimates from local logs. The real plan percentages come fro
 | Variable | Purpose |
 |---|---|
 | `CCMETER_CONFIG` | Config file path |
+| `NO_COLOR` | Turns off terminal color (no-color.org) |
 | `CLAUDE_CONFIG_DIR` | Account auto-detection (comma separated) and account selection in statusline/hook |
 | `CCMETER_CLAUDE_BIN` | Path to the `claude` CLI if it isn't on PATH (common for background services and GUI-launched VS Code) |
 | `CCMETER_BIN` | Path to `ccmeter` for the plugin's hook script |
