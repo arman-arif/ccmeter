@@ -24,7 +24,7 @@ make                      # cross-compiled bundle for all platforms in build/bin
 make build                # build/bin/ccmeter for this machine
 make check                # gofmt, vet x3, tests, plugin validation (run before committing)
 make serve                # build, then dashboard on http://127.0.0.1:7878
-make install              # to /usr/local/bin; PREFIX=~/.local for no sudo
+make install              # copies build/bin/ccmeter to /usr/local/bin, never builds (sudo has no go on PATH); PREFIX=~/.local for no sudo
 ./build/bin/ccmeter       # table (refreshes stale plan limits first)
 ```
 `build/`, `dist/` and a root `ccmeter` binary are gitignored. `gofmt` may not be on PATH; the Makefile uses `$(go env GOROOT)/bin/gofmt`.

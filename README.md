@@ -15,7 +15,7 @@ go install github.com/arman-arif/ccmeter@latest   # installs to ~/go/bin
 Or build from a clone:
 
 ```bash
-make build            # builds build/bin/ccmeter
+make build            # builds build/bin/ccmeter (not under sudo: it usually can't find go)
 sudo make install     # copies it to /usr/local/bin (or: make install PREFIX=~/.local)
 ```
 

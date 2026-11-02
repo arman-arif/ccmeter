@@ -19,7 +19,7 @@ help:
 	@echo "make test       go test ./..."
 	@echo "make check      gofmt, vet (linux, darwin, windows), tests, plugin validation"
 	@echo "make fmt        gofmt -w ."
-	@echo "make install    copy $(BIN)/$(BINARY) to $(PREFIX)/bin (PREFIX=~/.local for no sudo)"
+	@echo "make install    copy $(BIN)/$(BINARY) to $(PREFIX)/bin; run make build first (PREFIX=~/.local for no sudo)"
 	@echo "make uninstall  remove $(PREFIX)/bin/$(BINARY)"
 	@echo "make serve      build and run the dashboard on http://127.0.0.1:7878"
 	@echo "make clean      remove build/"
@@ -68,7 +68,16 @@ validate:
 		echo "claude not found, skipping plugin validation"; \
 	fi
 
-install: build
+# Doesn't build: sudo resets PATH, so go usually isn't found under it.
+# Run `make build` first, then `sudo make install`.
+install:
+	@if [ ! -f $(BIN)/$(BINARY) ]; then \
+		echo "$(BIN)/$(BINARY) not found. Run 'make build' first (without sudo), then 'sudo make install'."; \
+		exit 1; \
+	fi
+	@if [ -n "$$(find . -path ./build -prune -o \( -name '*.go' -o -path './web/*' \) -newer $(BIN)/$(BINARY) -print | head -1)" ]; then \
+		echo "warning: $(BIN)/$(BINARY) is older than the source; run 'make build' to update it"; \
+	fi
 	install -d $(DESTDIR)$(PREFIX)/bin
 	install -m 755 $(BIN)/$(BINARY) $(DESTDIR)$(PREFIX)/bin/$(BINARY)
 
