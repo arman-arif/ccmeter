@@ -209,6 +209,8 @@ a.btn { text-decoration: none; }
 .tab-end { margin-left: auto; }
 .tab:hover { color: var(--text-primary); }
 .tab[aria-current="page"] { color: var(--text-primary); border-bottom-color: var(--series-1); font-weight: 600; }
+.card-limits { margin-top: 14px; }
+.card-limits > :last-child { margin-bottom: 0; }
 .card-link { display: inline-flex; align-items: center; gap: 4px; margin-top: 12px; font-size: 13px; color: var(--text-secondary); text-decoration: none; }
 .card-link:hover { color: var(--text-primary); text-decoration: underline; }
 .card-link .icon { width: 13px; height: 13px; }
@@ -216,7 +218,7 @@ a.btn { text-decoration: none; }
 /* Account page */
 .acct-head .card-head { margin-bottom: 2px; }
 .acct-head h2 { font-size: 20px; margin: 0; }
-.now { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 12px; align-items: start; }
+.now { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; align-items: start; }
 .now .plan-src, .now .plan:last-child { margin-bottom: 0; }
 .now .block { margin-bottom: 0; }
 .section { margin-bottom: 16px; min-width: 0; }

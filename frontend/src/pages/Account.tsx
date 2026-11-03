@@ -485,7 +485,6 @@ export function Account({ name, tick, onEdit }: { name: string; tick: number; on
         </>
       ) : (
         <>
-          <NowSection a={a} />
           <section className="totals">
             <Tile label="Today" t={a.today} />
             <Tile label="Last 7 days" t={a.week} note={a.week.limit_usd ? `${Math.round(a.week.pct ?? 0)}% of limit` : undefined} />
@@ -539,6 +538,7 @@ export function Account({ name, tick, onEdit }: { name: string; tick: number; on
           </div>
           <AccountSection info={a.account} />
           <SetupSection a={a} />
+          <NowSection a={a} />
         </>
       )}
       <footer>

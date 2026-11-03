@@ -76,7 +76,7 @@ ccmeter json         # raw data
 ccmeter serve        # dashboard on http://127.0.0.1:7878 (-addr, -interval, -read-only, -limits-interval)
 ```
 
-The dashboard's overview shows every account side by side. Each account also has its own page at `/accounts/<name>`, with its plan, email and organization, its plan limits and current 5-hour window, usage by day, by weekday and hour and by token type, past 5-hour windows, models, projects, recent sessions, and whether hooks and the status line are set up. Choose 7 or 30 days and cost, tokens or responses at the top of the page. The choice is kept in the link. The Prices page at `/prices` shows the price each of your models is charged at, your overrides and the built-in list.
+The dashboard's overview shows every account side by side. Each account also has its own page at `/accounts/<name>`, with usage by day, by weekday and hour and by token type, past 5-hour windows, models, projects, recent sessions, its plan, email and organization, whether hooks and the status line are set up, and, at the bottom, its plan limits and current 5-hour window. Choose 7 or 30 days and cost, tokens or responses at the top of the page. The choice is kept in the link. The Prices page at `/prices` shows the price each of your models is charged at, your overrides and the built-in list.
 
 Anyone who can reach the dashboard can read this, including your project folder paths and each account's email and organization. It only listens on `127.0.0.1` unless you change `-addr`.
 

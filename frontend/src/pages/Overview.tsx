@@ -59,25 +59,6 @@ function AccountCard({ a, onEdit }: { a: Summary; onEdit?: (name: string) => voi
       </div>
       <EmailLine info={a.account} />
       <DirLine dir={a.dir} />
-      {hasPlan(a.plan) ? (
-        <PlanBars plan={a.plan} block={a.block} />
-      ) : (
-        <>
-          <BlockEstimate block={a.block} />
-          <div className="hint">
-            <Icon name="info" />
-            <span>
-              Estimated from local logs. For your real 5-hour and weekly plan limits, run <code>ccmeter hook install</code>.
-            </span>
-          </div>
-        </>
-      )}
-      {a.plan_error && (
-        <div className="note plan-note">
-          <Icon name="alert" />
-          <span>Plan limits: {a.plan_error}</span>
-        </div>
-      )}
       <div className="periods">
         <PeriodStat label="Today" p={a.today} />
         <PeriodStat label="7 days" p={a.week} />
@@ -105,6 +86,27 @@ function AccountCard({ a, onEdit }: { a: Summary; onEdit?: (name: string) => voi
           </span>
         </div>
       )}
+      <div className="card-limits">
+        {hasPlan(a.plan) ? (
+          <PlanBars plan={a.plan} block={a.block} />
+        ) : (
+          <>
+            <BlockEstimate block={a.block} />
+            <div className="hint">
+              <Icon name="info" />
+              <span>
+                Estimated from local logs. For your real 5-hour and weekly plan limits, run <code>ccmeter hook install</code>.
+              </span>
+            </div>
+          </>
+        )}
+        {a.plan_error && (
+          <div className="note plan-note">
+            <Icon name="alert" />
+            <span>Plan limits: {a.plan_error}</span>
+          </div>
+        )}
+      </div>
       {details}
     </article>
   );
