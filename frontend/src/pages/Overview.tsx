@@ -86,6 +86,9 @@ function AccountCard({ a, onEdit }: { a: Summary; onEdit?: (name: string) => voi
           </span>
         </div>
       )}
+      <div style={{ marginTop: '0.5rem' }}>
+        {details}
+      </div>
       <div className="card-limits">
         {hasPlan(a.plan) ? (
           <PlanBars plan={a.plan} block={a.block} />
@@ -107,7 +110,6 @@ function AccountCard({ a, onEdit }: { a: Summary; onEdit?: (name: string) => voi
           </div>
         )}
       </div>
-      {details}
     </article>
   );
 }

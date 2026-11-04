@@ -49,7 +49,7 @@ build:
 # Go embeds src/web and doesn't run npm, so src/web is committed: `go build`
 # and `go install` need no Node. Rebuild it after changing frontend/.
 web: frontend/node_modules
-	cd frontend && npm run build
+	cd frontend && npm install && npm run build
 
 frontend/node_modules: frontend/package-lock.json
 	cd frontend && npm ci

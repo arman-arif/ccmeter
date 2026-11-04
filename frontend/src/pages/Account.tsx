@@ -519,6 +519,7 @@ export function Account({ name, tick, onEdit }: { name: string; tick: number; on
               <ActivitySection r={r} metricKey={metricKey} />
               <TokenMix r={r} />
             </div>
+            <NowSection a={a} />
             <WindowsSection r={r} metricKey={metricKey} />
             {r.messages > 0 && (
               <>
@@ -538,7 +539,6 @@ export function Account({ name, tick, onEdit }: { name: string; tick: number; on
           </div>
           <AccountSection info={a.account} />
           <SetupSection a={a} />
-          <NowSection a={a} />
         </>
       )}
       <footer>
