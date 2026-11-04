@@ -4,7 +4,7 @@ import { BarChart } from '../components/BarChart';
 import { Heatmap, hourLabel, WEEKDAYS } from '../components/Heatmap';
 import { Icon } from '../components/Icon';
 import { BlockEstimate, hasPlan, PlanBars, planSource } from '../components/Limits';
-import { DirLine, EmailLine, PlanTag, Section, Tile } from '../components/Stats';
+import { CountTile, DirLine, EmailLine, PlanTag, Section, Tile } from '../components/Stats';
 import { Segmented, Table, TableView, type Column } from '../components/Table';
 import { ago, baseName, count, dateTime, fullDate, fullDay, hasTime, hhmm, longDate, percent, shortDate, shortDay, shortModel, tok, usd } from '../format';
 import { usePoll, useTitle } from '../hooks';
@@ -451,6 +451,8 @@ export function Account({ name, tick, onEdit }: { name: string; tick: number; on
   }
 
   const r = a.range;
+  // An account with no usage yet has no all-time figures, and its 30 days are all zero.
+  const periods = { today: a.today, week: a.week, month: a.month, all: a.all_time ?? a.month };
   return (
     <>
       <div className="acct-head">
@@ -485,11 +487,15 @@ export function Account({ name, tick, onEdit }: { name: string; tick: number; on
         </>
       ) : (
         <>
-          <section className="totals four">
+          <section className="totals four above">
             <Tile label="Today" t={a.today} />
             <Tile label="Last 7 days" t={a.week} note={a.week.limit_usd ? `${Math.round(a.week.pct ?? 0)}% of limit` : undefined} />
             <Tile label="Last 30 days" t={a.month} />
             {a.all_time && <Tile label={`All time, since ${fullDate(a.all_time.since)}`} t={a.all_time} />}
+          </section>
+          <section className="totals two-up">
+            <CountTile label="Responses" periods={periods} value={t => t.messages} format={count} />
+            <CountTile label="Tokens" periods={periods} value={t => t.tokens} format={tok} />
           </section>
 
           <div className="filters">

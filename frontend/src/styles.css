@@ -186,8 +186,10 @@ form.acct-form { margin-top: 10px; border: 1px solid var(--border); border-radiu
 .readonly-note { color: var(--text-muted); font-size: 12px; margin-top: 10px; display: flex; gap: 6px; align-items: center; }
 @media (max-width: 640px) { .row2 { grid-template-columns: 1fr; } }
 .totals.four { grid-template-columns: repeat(4, 1fr); }
+.totals.two-up { grid-template-columns: repeat(2, 1fr); }
+.totals.above { margin-bottom: 12px; }
 @media (max-width: 900px) { .totals.four { grid-template-columns: repeat(2, 1fr); } }
-@media (max-width: 640px) { .totals, .totals.four { grid-template-columns: 1fr; } .grid { grid-template-columns: 1fr; } }
+@media (max-width: 640px) { .totals, .totals.four, .totals.two-up { grid-template-columns: 1fr; } .grid { grid-template-columns: 1fr; } }
 
 /* Meters carry severity in the fill as well as the words beside them. */
 .bar.near > span { background: var(--warn-ink); }

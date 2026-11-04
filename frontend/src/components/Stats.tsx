@@ -16,6 +16,25 @@ export function Tile({ label, t, note }: { label: string; t: Totals; note?: stri
   );
 }
 
+// One measure over every period: the all-time figure, then the shorter ones.
+export function CountTile(props: {
+  label: string;
+  periods: { today: Totals; week: Totals; month: Totals; all: Totals };
+  value: (t: Totals) => number;
+  format: (n: number) => string;
+}) {
+  const { label, periods, value, format } = props;
+  return (
+    <div className="tile">
+      <div className="label">{label}, all time</div>
+      <div className="value">{format(value(periods.all))}</div>
+      <div className="sub">
+        Today {format(value(periods.today))} · 7 days {format(value(periods.week))} · 30 days {format(value(periods.month))}
+      </div>
+    </div>
+  );
+}
+
 export function PeriodStat({ label, p }: { label: string; p: Period }) {
   return (
     <div>
