@@ -10,10 +10,10 @@ ccmeter is a Claude Code usage meter for **several accounts at once**. Each acco
 
 - **One commit per logical step**, with descriptive messages (subject plus a short body). Push to `main` after each piece of work, unless asked otherwise.
 - **No emoji anywhere in the web UI.** All icons are inline SVG `<symbol>`s in the sprite in `frontend/index.html`, used via `<Icon name="..." />`.
-- **Go standard library only** (`time/tzdata` is embedded for Windows). Keep it a single self-contained binary; the dashboard is `//go:embed web`.
-- **`web/` is build output, and it is committed**, so `go install` and `go build` need no Node. Edit `frontend/`, never `web/`. After changing `frontend/`, run `make web` and commit both.
+- **Go standard library only** (`time/tzdata` is embedded for Windows). Keep it a single self-contained binary; the dashboard is `//go:embed web` in `src/`.
+- **`src/web/` is build output, and it is committed**, so `go install` and `go build` need no Node. Edit `frontend/`, never `src/web/`. After changing `frontend/`, run `make web` and commit both.
 - Keep frontend dependencies to React and the build tools. The router and charts are small files of our own.
-- Before committing, run `make check` (gofmt, `go vet` for all three OSes, `go test ./...`, plugin validation, and whether `web/` matches `frontend/`).
+- Before committing, run `make check` (gofmt, `go vet` for all three OSes, `go test ./...`, plugin validation, and whether `src/web/` matches `frontend/`).
 - The plugin must pass `claude plugin validate .` and `claude plugin validate ./plugin`.
 - Never print or log access tokens. ccmeter only ever **reads** Claude logins and never refreshes or writes them.
 - Hooks must never slow down or fail a Claude Code turn: return immediately, print nothing, exit 0.
@@ -24,9 +24,9 @@ ccmeter is a Claude Code usage meter for **several accounts at once**. Each acco
 ```bash
 make                      # cross-compiled bundle for all platforms in build/bin/, with SHA256SUMS
 make build                # build/bin/ccmeter for this machine
-make check                # gofmt, vet x3, tests, plugin validation, web/ up to date (run before committing)
+make check                # gofmt, vet x3, tests, plugin validation, src/web/ up to date (run before committing)
 make serve                # build, then dashboard on http://127.0.0.1:7878
-make web                  # rebuild web/ from frontend/ (needs Node; installs packages on first use)
+make web                  # rebuild src/web/ from frontend/ (needs Node; installs packages on first use)
 cd frontend && npm run dev  # live-reloading dashboard, using the API on 127.0.0.1:7878
 make install              # copies build/bin/ccmeter to /usr/local/bin, never builds (sudo has no go on PATH); PREFIX=~/.local for no sudo
 ./build/bin/ccmeter       # table (refreshes stale plan limits first)
@@ -56,33 +56,35 @@ Global flags: `-config PATH` (default `$CCMETER_CONFIG`, else `<user config dir>
 
 | File | Responsibility |
 |---|---|
-| `main.go` | Argument parsing and dispatch, formatting helpers (`fmtTok`, `fmtUSD`, `fmtDur`, `blockCell`, used by the status line). `version` constant. |
-| `ui.go` | Terminal output: color detection, `table` (aligns cells that contain color codes, which text/tabwriter can't), usage meters, `printTable`, `printLimits`, `printAccounts`. Tables stay within 80 columns. Color is decoration only: alerts are also in words, so piped output and `NO_COLOR` lose nothing. Near-limit thresholds match the dashboard (80%, 100%). |
-| `term_unix.go` / `term_windows.go` | `enableTerminalColor` (turns on ANSI in the Windows console, plain text where unsupported). |
-| `config.go` | `Config`/`AccountConfig` (name, dir, `block_limit_usd`, `weekly_limit_usd`, `pricing` overrides), config path, auto-detection, `init`. |
-| `accounts.go` | Shared rules for adding, updating and removing accounts (`upsertAccount`, `removeAccount`, used by the CLI and the web API). `saveConfig` writes atomically. |
-| `pricing.go` | `builtinPrices`, the API list prices as ordered rules: versions first (`isModelVersion`, so `sonnet-5` doesn't match `sonnet-5-5`), then a fallback per family at its newest price. Mostly cache write is 1.25x input (5-minute) or 2x (1-hour) and cache read 0.1x, but rates differ by model (Opus 5.5 and Sonnet 5.5 read at 0.05x, Fable 5.1 at 0.025x), and Haiku 5.5 charges more for prompts over 100K tokens. When changing the table, re-check it against `pricesSourceURL`, then update `pricesCheckedOn` and `pricing_test.go`. Models of no known family, and Mythos Preview, are reported as "unpriced", and the user adds them under `pricing`. |
-| `scan.go` | Incremental JSONL scanner over `<dir>/projects/**/*.jsonl`. It keeps a byte offset per file, resumes after partial lines, dedupes by `message.id:requestId`, skips `<synthetic>`, and keeps 31 days in memory. Each entry records its project (the log folder under `projects/`, not `cwd`, which follows every `cd`) and session; `paths` maps a folder to its real path, using the `cwd` that encodes to the folder's name. |
-| `stats.go` | `summarize` builds the `Summary` for each account: the 5-hour block (starts at the hour of the first message, ends 5h later or after a 5h gap), burn rate, projection, % of the configured limit or of the 30-day peak block, today / rolling 7d / 30d, daily series, models, `Plan` (real limits) and `PlanError`. |
-| `detail.go` | `buildDetail` for the account page: the `Summary`, a `RangeDetail` for the last N calendar days (daily, models, projects, sessions, 5-hour windows, weekday/hour cells) and `AccountSetup` (hooks, plugin and status line yes/no from `settings.json`, plus the fetch state). |
-| `prices.go` | `buildPrices` for the Prices page: the models in the logs with the price each resolved to, the user's overrides and the built-in list. |
-| `accountinfo.go` | `readAccountInfo`: plan, email, name, organization and dates from the `oauthAccount` profile in `.claude.json` (for the default `~/.claude`, the file beside the folder, `~/.claude.json`, comes first). Only named fields are decoded, so no other part of that file can reach the API, and `.credentials.json` is never read for this. Filled in by `buildReport` and `buildDetail`, not `summarize`, because the status line must stay quick. |
-| `statusline.go` | `ccmeter statusline`: picks the account from `CLAUDE_CONFIG_DIR`, then the transcript path, then the first account. Saves `rate_limits` and prints one line. |
-| `limits.go` | Plan limit storage: `LimitWindow`, `ModelLimit` (a model's own weekly limit, such as Fable), `PlanLimits`, `saveLimitWindows` / `loadLimits` (one file per config dir, keyed by a hash of the dir). Marks a window `Reset` once its reset time passes. Status-line install/uninstall. |
-| `claudecli.go` | **Primary limits source:** runs `claude -p /usage --output-format json` per account and parses the text. |
-| `usageapi.go` | **Opt-in source:** the undocumented endpoint behind `/usage`. Also the read-only credential reader, the fetch state file (throttle and backoff), the per-account lock, `refreshLimits` and `fetchPlanLimits` (CLI only by default; `auto` adds the endpoint as a fallback). |
-| `limitsched.go` | Scheduler inside `serve` (active accounts every `-limits-interval`, default 5m; idle accounts every 30m; one at a time). Manual refresh trigger. `refreshDueLimits` is used by table/json. |
-| `hook.go` | `ccmeter hook` (finds the account from `CLAUDE_CONFIG_DIR` or `<dir>/projects/...` in the transcript path, then spawns a detached `hook-fetch` when one is due), `limits`, and hook install/uninstall with settings.json merging. |
-| `server.go` | HTTP server. Hot-reloads the config while keeping scan state for unchanged dirs. API routes are listed below. Every request must name an IP, `localhost`, the machine's hostname or the `-addr` host in `Host` (`localOnly`, which blocks DNS rebinding). Write routes only accept loopback requests from the dashboard's own origin (`sameMachine`); `-read-only` disables account edits. |
-| `daemon.go` | start/stop/status, pid file, `/api/health` probing (stop only signals a pid the dashboard confirms), `ensureConfigFile`, `serveOpts`. |
-| `detach_unix.go` / `detach_windows.go` | Detaching the child process (setsid / DETACHED_PROCESS + CREATE_NO_WINDOW) and terminating it. |
-| `autostart.go` | Per-OS autostart. Renderers for the systemd unit, desktop entry, launchd plist and VBS, with careful quoting (unit-tested). |
+| `main.go` | Entry point only: calls `ccmeter.Main()` in `src/`. |
+| `src/run.go` | Argument parsing and dispatch (`Main`), the `usage` text, `fail`, `scanAll`, and the formatting helpers (`fmtTok`, `fmtUSD`, `fmtDur`, `blockCell`, used by the status line). |
+| `src/version.go` | The `version` constant (the Makefile scrapes it for `make bundle`). |
+| `src/ui.go` | Terminal output: color detection, `table` (aligns cells that contain color codes, which text/tabwriter can't), usage meters, `printTable`, `printLimits`, `printAccounts`. Tables stay within 80 columns. Color is decoration only: alerts are also in words, so piped output and `NO_COLOR` lose nothing. Near-limit thresholds match the dashboard (80%, 100%). |
+| `src/term_unix.go` / `src/term_windows.go` | `enableTerminalColor` (turns on ANSI in the Windows console, plain text where unsupported). |
+| `src/config.go` | `Config`/`AccountConfig` (name, dir, `block_limit_usd`, `weekly_limit_usd`, `pricing` overrides), config path, auto-detection, `init`. |
+| `src/accounts.go` | Shared rules for adding, updating and removing accounts (`upsertAccount`, `removeAccount`, used by the CLI and the web API). `saveConfig` writes atomically. |
+| `src/pricing.go` | `builtinPrices`, the API list prices as ordered rules: versions first (`isModelVersion`, so `sonnet-5` doesn't match `sonnet-5-5`), then a fallback per family at its newest price. Mostly cache write is 1.25x input (5-minute) or 2x (1-hour) and cache read 0.1x, but rates differ by model (Opus 5.5 and Sonnet 5.5 read at 0.05x, Fable 5.1 at 0.025x), and Haiku 5.5 charges more for prompts over 100K tokens. When changing the table, re-check it against `pricesSourceURL`, then update `pricesCheckedOn` and `pricing_test.go`. Models of no known family, and Mythos Preview, are reported as "unpriced", and the user adds them under `pricing`. |
+| `src/scan.go` | Incremental JSONL scanner over `<dir>/projects/**/*.jsonl`. It keeps a byte offset per file, resumes after partial lines, dedupes by `message.id:requestId`, skips `<synthetic>`, and keeps 31 days in memory. Each entry records its project (the log folder under `projects/`, not `cwd`, which follows every `cd`) and session; `paths` maps a folder to its real path, using the `cwd` that encodes to the folder's name. |
+| `src/stats.go` | `summarize` builds the `Summary` for each account: the 5-hour block (starts at the hour of the first message, ends 5h later or after a 5h gap), burn rate, projection, % of the configured limit or of the 30-day peak block, today / rolling 7d / 30d, daily series, models, `Plan` (real limits) and `PlanError`. |
+| `src/detail.go` | `buildDetail` for the account page: the `Summary`, a `RangeDetail` for the last N calendar days (daily, models, projects, sessions, 5-hour windows, weekday/hour cells) and `AccountSetup` (hooks, plugin and status line yes/no from `settings.json`, plus the fetch state). |
+| `src/prices.go` | `buildPrices` for the Prices page: the models in the logs with the price each resolved to, the user's overrides and the built-in list. |
+| `src/accountinfo.go` | `readAccountInfo`: plan, email, name, organization and dates from the `oauthAccount` profile in `.claude.json` (for the default `~/.claude`, the file beside the folder, `~/.claude.json`, comes first). Only named fields are decoded, so no other part of that file can reach the API, and `.credentials.json` is never read for this. Filled in by `buildReport` and `buildDetail`, not `summarize`, because the status line must stay quick. |
+| `src/statusline.go` | `ccmeter statusline`: picks the account from `CLAUDE_CONFIG_DIR`, then the transcript path, then the first account. Saves `rate_limits` and prints one line. |
+| `src/limits.go` | Plan limit storage: `LimitWindow`, `ModelLimit` (a model's own weekly limit, such as Fable), `PlanLimits`, `saveLimitWindows` / `loadLimits` (one file per config dir, keyed by a hash of the dir). Marks a window `Reset` once its reset time passes. Status-line install/uninstall. |
+| `src/claudecli.go` | **Primary limits source:** runs `claude -p /usage --output-format json` per account and parses the text. |
+| `src/usageapi.go` | **Opt-in source:** the undocumented endpoint behind `/usage`. Also the read-only credential reader, the fetch state file (throttle and backoff), the per-account lock, `refreshLimits` and `fetchPlanLimits` (CLI only by default; `auto` adds the endpoint as a fallback). |
+| `src/limitsched.go` | Scheduler inside `serve` (active accounts every `-limits-interval`, default 5m; idle accounts every 30m; one at a time). Manual refresh trigger. `refreshDueLimits` is used by table/json. |
+| `src/hook.go` | `ccmeter hook` (finds the account from `CLAUDE_CONFIG_DIR` or `<dir>/projects/...` in the transcript path, then spawns a detached `hook-fetch` when one is due), `limits`, and hook install/uninstall with settings.json merging. |
+| `src/server.go` | HTTP server. Hot-reloads the config while keeping scan state for unchanged dirs. API routes are listed below. Every request must name an IP, `localhost`, the machine's hostname or the `-addr` host in `Host` (`localOnly`, which blocks DNS rebinding). Write routes only accept loopback requests from the dashboard's own origin (`sameMachine`); `-read-only` disables account edits. |
+| `src/daemon.go` | start/stop/status, pid file, `/api/health` probing (stop only signals a pid the dashboard confirms), `ensureConfigFile`, `serveOpts`. |
+| `src/detach_unix.go` / `src/detach_windows.go` | Detaching the child process (setsid / DETACHED_PROCESS + CREATE_NO_WINDOW) and terminating it. |
+| `src/autostart.go` | Per-OS autostart. Renderers for the systemd unit, desktop entry, launchd plist and VBS, with careful quoting (unit-tested). |
 | `frontend/` | The dashboard's source: React, TypeScript, Vite. `index.html` has the SVG icon sprite and sets the theme before first paint. `src/App.tsx` is the header, tabs, refresh and theme; `src/router.tsx` a small history router; `src/hooks.ts` `usePoll` (15s) and `useWidth`; `src/api.ts` types mirroring the Go JSON. `src/pages/Overview.tsx` has totals and account cards, `src/pages/Account.tsx` the page for one account (`/accounts/<name>?days=7&metric=tokens`), `src/pages/Prices.tsx` the price list (`/prices`). `src/components/` has `BarChart`, `Heatmap`, `Table` (with the chart table views and `Segmented`), `Limits`, `Stats` and `AccountsDialog`. |
-| `web/` | Vite's build of `frontend/`, committed and embedded. Don't edit it by hand. |
+| `src/web/` | Vite's build of `frontend/`, committed and embedded by `src/server.go`. Don't edit it by hand. |
 | `plugin/` and `.claude-plugin/marketplace.json` | Claude Code plugin (see below). |
-| `*_test.go` | Tests for autostart renderers, /usage parsing (real output fixture), the fake-CLI flow, hook routing, settings merge, endpoint fetch with throttle and expiry, the endpoint being opt-in, the dashboard's Host check, and the scheduler. |
+| `src/*_test.go` | Tests for autostart renderers, /usage parsing (real output fixture), the fake-CLI flow, hook routing, settings merge, endpoint fetch with throttle and expiry, the endpoint being opt-in, the dashboard's Host check, and the scheduler. |
 
-### HTTP API (`server.go`)
+### HTTP API (`src/server.go`)
 - `GET /api/summary`: the `Report` (all accounts and totals).
 - `GET /api/health`: `{pid, version, addr, config, started}`, used by start/stop/status.
 - `GET /api/accounts`, `POST /api/accounts` (add, or edit via `original`), `DELETE /api/accounts?name=`.
@@ -151,7 +153,7 @@ Dollar figures are estimates from local logs. The real plan percentages come fro
 - **Fake data:** generate JSONL under a temp `HOME` (e.g. `/tmp/fakehome/.claude/projects/x/s.jsonl`) with assistant lines carrying `message.usage`, and set `HOME`, `XDG_CACHE_HOME` and `XDG_CONFIG_HOME` to the temp dir.
 - **Fake `claude`:** a shell script printing `{"is_error":false,"num_turns":0,"local_command":"usage","result":"Current session: ..."}`, pointed to by `CCMETER_CLAUDE_BIN`.
 - **Fake endpoint:** a local HTTP server, plus `CCMETER_USAGE_URL`.
-- **UI checks:** Playwright screenshots of `ccmeter serve` in light and dark mode, on the overview and an account page, and at phone width. Check for page errors, and grep `frontend/` and `web/` for emoji code points.
+- **UI checks:** Playwright screenshots of `ccmeter serve` in light and dark mode, on the overview and an account page, and at phone width. Check for page errors, and grep `frontend/` and `src/web/` for emoji code points.
 - **Real logs matter:** also run against real logs with `-read-only -limits-interval 0`. Fake data hid that `cwd` changes mid-session.
 - **Safety:** don't `pkill -f` with a pattern that matches your own shell command. Use `pgrep -x ccmeter` or the pid file.
 
@@ -165,14 +167,14 @@ Dollar figures are estimates from local logs. The real plan percentages come fro
 6. VS Code reality check: the extension doesn't run status lines, but hooks fire. Added the usage-endpoint fetch, `ccmeter hook`, `hook install`, `ccmeter limits`, and the Claude Code plugin and marketplace.
 7. The user found `claude -p /usage` works in print mode. Made it the primary source, with real output as a test fixture.
 8. ccmeter now refreshes limits by itself: the scheduler in `serve`, the Refresh button, and table/json refreshing stale data.
-9. Dashboard rebuilt in React (`frontend/`, built into a committed `web/`), with a page for each account: range and measure filters, daily chart, weekday/hour heatmap, token types, 5-hour window history, models, projects, sessions, setup status.
+9. Dashboard rebuilt in React (`frontend/`, built into a committed `src/web/`), with a page for each account: range and measure filters, daily chart, weekday/hour heatmap, token types, 5-hour window history, models, projects, sessions, setup status.
 10. Prices page (`/prices`), and the built-in prices brought up to date with the Claude 5 family: they had been charging newer models at older, higher prices.
 11. Separate weekly limits per model (Fable on Max), and an account section with plan, email and organization on each account.
 
 ## Open items and ideas
 
 - Built-in prices are a table in the binary, so they go out of date when Anthropic changes prices. The Prices page says when they were last checked.
-- `version` in main.go and the plugin are both `0.2.0`; bump them together. Consider GitHub Releases with cross-compiled binaries (`make` output in `build/bin/`).
+- `version` in src/version.go and the plugin are both `0.2.0`; bump them together. Consider GitHub Releases with cross-compiled binaries (`make` output in `build/bin/`).
 - **Not yet verified on real machines:** macOS Keychain naming for non-default dirs in the opt-in endpoint, the Windows plugin hook (runs via `sh`), systemd/launchd autostart (only the renderers are unit-tested; the Linux desktop-entry path was run for real), and real `claude -p /usage` from the background service's PATH.
 - **Idea:** a small VS Code extension showing `5h % · wk %` per account in the VS Code status bar, reading `/api/summary`.
 - **Idea:** a dashboard button to run `hook install` / `statusline install` per account.

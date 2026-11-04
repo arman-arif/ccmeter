@@ -21,7 +21,7 @@ sudo make install     # copies it to /usr/local/bin (or: make install PREFIX=~/.
 
 `make` on its own cross-compiles for Linux, macOS and Windows (amd64 and arm64) into `build/bin/`, with a `SHA256SUMS` file. `make help` lists every target. Without make, `go build -o ccmeter .` works too.
 
-None of this needs Node. The dashboard is a React app in `frontend/`, and its build is committed in `web/` and embedded in the binary. You only need Node to change the dashboard: run `make web` afterwards and commit `web/`. While working on it, `cd frontend && npm run dev` serves it with live reload against a dashboard running on the default address.
+None of this needs Node. The dashboard is a React app in `frontend/`, and its build is committed in `src/web/` and embedded in the binary. You only need Node to change the dashboard: run `make web` afterwards and commit `src/web/`. While working on it, `cd frontend && npm run dev` serves it with live reload against a dashboard running on the default address.
 
 ## Set up accounts
 
