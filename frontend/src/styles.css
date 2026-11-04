@@ -185,7 +185,9 @@ form.acct-form { margin-top: 10px; border: 1px solid var(--border); border-radiu
 .form-error { color: var(--danger-ink); font-size: 12px; display: flex; align-items: center; gap: 6px; margin-right: auto; }
 .readonly-note { color: var(--text-muted); font-size: 12px; margin-top: 10px; display: flex; gap: 6px; align-items: center; }
 @media (max-width: 640px) { .row2 { grid-template-columns: 1fr; } }
-@media (max-width: 640px) { .totals { grid-template-columns: 1fr; } .grid { grid-template-columns: 1fr; } }
+.totals.four { grid-template-columns: repeat(4, 1fr); }
+@media (max-width: 900px) { .totals.four { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 640px) { .totals, .totals.four { grid-template-columns: 1fr; } .grid { grid-template-columns: 1fr; } }
 
 /* Meters carry severity in the fill as well as the words beside them. */
 .bar.near > span { background: var(--warn-ink); }

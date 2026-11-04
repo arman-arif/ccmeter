@@ -178,6 +178,7 @@ export interface AccountSetup {
 }
 
 export interface AccountDetail extends Summary {
+  all_time?: Totals & { since: string };
   setup: AccountSetup;
   range: RangeDetail;
 }

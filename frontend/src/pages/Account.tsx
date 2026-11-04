@@ -6,7 +6,7 @@ import { Icon } from '../components/Icon';
 import { BlockEstimate, hasPlan, PlanBars, planSource } from '../components/Limits';
 import { DirLine, EmailLine, PlanTag, Section, Tile } from '../components/Stats';
 import { Segmented, Table, TableView, type Column } from '../components/Table';
-import { ago, baseName, count, dateTime, fullDay, hasTime, hhmm, longDate, percent, shortDate, shortDay, shortModel, tok, usd } from '../format';
+import { ago, baseName, count, dateTime, fullDate, fullDay, hasTime, hhmm, longDate, percent, shortDate, shortDay, shortModel, tok, usd } from '../format';
 import { usePoll, useTitle } from '../hooks';
 import { Link, navigate, useUrl } from '../router';
 import { NotFound } from './NotFound';
@@ -485,10 +485,11 @@ export function Account({ name, tick, onEdit }: { name: string; tick: number; on
         </>
       ) : (
         <>
-          <section className="totals">
+          <section className="totals four">
             <Tile label="Today" t={a.today} />
             <Tile label="Last 7 days" t={a.week} note={a.week.limit_usd ? `${Math.round(a.week.pct ?? 0)}% of limit` : undefined} />
             <Tile label="Last 30 days" t={a.month} />
+            {a.all_time && <Tile label={`All time, since ${fullDate(a.all_time.since)}`} t={a.all_time} />}
           </section>
 
           <div className="filters">

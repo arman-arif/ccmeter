@@ -76,7 +76,7 @@ ccmeter json         # raw data
 ccmeter serve        # dashboard on http://127.0.0.1:7878 (-addr, -interval, -read-only, -limits-interval)
 ```
 
-The dashboard's overview shows every account side by side. Each account also has its own page at `/accounts/<name>`, with usage by day, by weekday and hour and by token type, its plan limits and current 5-hour window, past 5-hour windows, models, projects, recent sessions, its plan, email and organization, and whether hooks and the status line are set up. Choose 7 or 30 days and cost, tokens or responses at the top of the page. The choice is kept in the link. The Prices page at `/prices` shows the price each of your models is charged at, your overrides and the built-in list.
+The dashboard's overview shows every account side by side. Each account also has its own page at `/accounts/<name>`, with usage by day, by weekday and hour and by token type, its plan limits and current 5-hour window, past 5-hour windows, models, projects, recent sessions, its plan, email and organization, and whether hooks and the status line are set up. Choose 7 or 30 days and cost, tokens or responses at the top of the page. The choice is kept in the link. The All time tile keeps counting after Claude Code deletes old logs (after 30 days by default), because the dashboard saves its own totals in `usage/` beside the config file. It starts from the oldest log on disk when the dashboard first runs, and shows that date. The Prices page at `/prices` shows the price each of your models is charged at, your overrides and the built-in list.
 
 Anyone who can reach the dashboard can read this, including your project folder paths and each account's email and organization. It only listens on `127.0.0.1` unless you change `-addr`.
 

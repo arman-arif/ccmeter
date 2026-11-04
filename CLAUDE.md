@@ -64,7 +64,8 @@ Global flags: `-config PATH` (default `$CCMETER_CONFIG`, else `<user config dir>
 | `src/config.go` | `Config`/`AccountConfig` (name, dir, `block_limit_usd`, `weekly_limit_usd`, `pricing` overrides), config path, auto-detection, `init`. |
 | `src/accounts.go` | Shared rules for adding, updating and removing accounts (`upsertAccount`, `removeAccount`, used by the CLI and the web API). `saveConfig` writes atomically. |
 | `src/pricing.go` | `builtinPrices`, the API list prices as ordered rules: versions first (`isModelVersion`, so `sonnet-5` doesn't match `sonnet-5-5`), then a fallback per family at its newest price. Mostly cache write is 1.25x input (5-minute) or 2x (1-hour) and cache read 0.1x, but rates differ by model (Opus 5.5 and Sonnet 5.5 read at 0.05x, Fable 5.1 at 0.025x), and Haiku 5.5 charges more for prompts over 100K tokens. When changing the table, re-check it against `pricesSourceURL`, then update `pricesCheckedOn` and `pricing_test.go`. Models of no known family, and Mythos Preview, are reported as "unpriced", and the user adds them under `pricing`. |
-| `src/scan.go` | Incremental JSONL scanner over `<dir>/projects/**/*.jsonl`. It keeps a byte offset per file, resumes after partial lines, dedupes by `message.id:requestId`, skips `<synthetic>`, and keeps 31 days in memory. Each entry records its project (the log folder under `projects/`, not `cwd`, which follows every `cd`) and session; `paths` maps a folder to its real path, using the `cwd` that encodes to the folder's name. |
+| `src/scan.go` | Incremental JSONL scanner over `<dir>/projects/**/*.jsonl`. It keeps a byte offset per file, resumes after partial lines, dedupes by `message.id:requestId`, skips `<synthetic>`, and keeps 31 days in memory (`src/alltime.go` handles anything older). Each entry records its project (the log folder under `projects/`, not `cwd`, which follows every `cd`) and session; `paths` maps a folder to its real path, using the `cwd` that encodes to the folder's name. |
+| `src/alltime.go` | The all-time ledger for the account page. Claude Code deletes logs after 30 days by default, so the dashboard's accounts (`newTrackedAccount`) read every log and save token totals per UTC day, model and long-prompt flag. On each scan the side with more responses wins per bucket, so re-reading logs after a restart counts nothing twice. It stores tokens, not costs, so prices apply at read time. The status line and table use plain accounts and don't touch it. |
 | `src/stats.go` | `summarize` builds the `Summary` for each account: the 5-hour block (starts at the hour of the first message, ends 5h later or after a 5h gap), burn rate, projection, % of the configured limit or of the 30-day peak block, today / rolling 7d / 30d, daily series, models, `Plan` (real limits) and `PlanError`. |
 | `src/detail.go` | `buildDetail` for the account page: the `Summary`, a `RangeDetail` for the last N calendar days (daily, models, projects, sessions, 5-hour windows, weekday/hour cells) and `AccountSetup` (hooks, plugin and status line yes/no from `settings.json`, plus the fetch state). |
 | `src/prices.go` | `buildPrices` for the Prices page: the models in the logs with the price each resolved to, the user's overrides and the built-in list. |
@@ -133,6 +134,7 @@ Dollar figures are estimates from local logs. The real plan percentages come fro
 
 - Config: `<user config dir>/ccmeter/config.json` (Linux: `~/.config/ccmeter/config.json`; macOS: `~/Library/Application Support/ccmeter/config.json`).
 - State (user cache dir `/ccmeter`): `ccmeter.pid`, `ccmeter.log` (background service), `hook.log` (detached fetch errors), `limits/*.json` (plan limits, per config dir), `limits/*.state.json`, `limits/*.lock`.
+- All-time ledger: `<user config dir>/ccmeter/usage/<hash>.json`, one per config dir. It's in the config dir, not the cache dir, because it's the only record once logs are deleted. A damaged file is renamed to `.bad`, not overwritten.
 - Per account: `settings.json` (status line and hooks) with a `settings.json.bak` written on every edit.
 
 ## Environment variables
@@ -170,9 +172,11 @@ Dollar figures are estimates from local logs. The real plan percentages come fro
 9. Dashboard rebuilt in React (`frontend/`, built into a committed `src/web/`), with a page for each account: range and measure filters, daily chart, weekday/hour heatmap, token types, 5-hour window history, models, projects, sessions, setup status.
 10. Prices page (`/prices`), and the built-in prices brought up to date with the Claude 5 family: they had been charging newer models at older, higher prices.
 11. Separate weekly limits per model (Fable on Max), and an account section with plan, email and organization on each account.
+12. An all-time tile on the account page, backed by a saved ledger because Claude Code deletes old logs.
 
 ## Open items and ideas
 
+- All time only goes back to the oldest log on disk when the dashboard first ran, and usage is lost if a log is written and deleted without the dashboard running in between (a month, by default). The tile says the date it starts from.
 - Built-in prices are a table in the binary, so they go out of date when Anthropic changes prices. The Prices page says when they were last checked.
 - `version` in src/version.go and the plugin are both `0.2.0`; bump them together. Consider GitHub Releases with cross-compiled binaries (`make` output in `build/bin/`).
 - **Not yet verified on real machines:** macOS Keychain naming for non-default dirs in the opt-in endpoint, the Windows plugin hook (runs via `sh`), systemd/launchd autostart (only the renderers are unit-tested; the Linux desktop-entry path was run for real), and real `claude -p /usage` from the background service's PATH.
