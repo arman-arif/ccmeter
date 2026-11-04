@@ -160,12 +160,18 @@ var builtinPrices = []priceRule{
 }
 
 func (p *Pricer) cost(e Entry) (float64, bool) {
+	return p.costAt(e, e.longPrompt())
+}
+
+// costAt is cost with the long-prompt rate decided by the caller, for summed
+// tokens, where the size of any one prompt can't be read from the entry.
+func (p *Pricer) costAt(e Entry, long bool) (float64, bool) {
 	match, ok := p.resolve(e.Model)
 	if !ok {
 		return 0, false
 	}
 	pr := match.Price
-	if match.Long != nil && e.In+e.CW5+e.CW1h+e.CR > longPromptTokens {
+	if match.Long != nil && long {
 		pr = match.Long.filled()
 	}
 	c := float64(e.In)*pr.Input +

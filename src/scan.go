@@ -29,6 +29,10 @@ type Entry struct {
 
 func (e Entry) Total() int64 { return e.In + e.Out + e.CW5 + e.CW1h + e.CR }
 
+// longPrompt says whether the prompt is long enough for a higher price on the
+// models that charge one.
+func (e Entry) longPrompt() bool { return e.In+e.CW5+e.CW1h+e.CR > longPromptTokens }
+
 type fileState struct {
 	off  int64
 	size int64
@@ -48,6 +52,16 @@ type Account struct {
 	paths   map[string]string // log folder name -> the real path it stands for
 	found   bool
 	lastErr string
+
+	// The all-time ledger, kept only by newTrackedAccount's accounts (alltime.go).
+	allTime     bool
+	logged      map[usageKey]usageBucket // totals from the logs read so far
+	first       time.Time                // the earliest response in those logs
+	ledger      map[usageKey]usageBucket // what's saved, nil until loaded
+	ledgerFirst time.Time
+	ledgerDirty bool
+	ledgerOff   bool
+	ledgerErr   string
 }
 
 func newAccount(c AccountConfig) *Account {
@@ -134,7 +148,8 @@ type rawLine struct {
 var usageMarker = []byte(`"usage"`)
 
 // Scan reads new lines from the account's projects/ folder. Files last
-// modified before cutoff are skipped, and so are entries older than cutoff.
+// modified before cutoff are skipped, and so are entries older than cutoff,
+// except that a tracked account counts those towards its all-time ledger.
 func (a *Account) Scan(cutoff time.Time) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
@@ -157,7 +172,7 @@ func (a *Account) Scan(cutoff time.Time) {
 			return nil
 		}
 		info, err := d.Info()
-		if err != nil || info.ModTime().Before(cutoff) {
+		if err != nil || (!a.allTime && info.ModTime().Before(cutoff)) {
 			return nil
 		}
 		fsState := a.files[path]
@@ -185,6 +200,9 @@ func (a *Account) Scan(cutoff time.Time) {
 			}
 		}
 		a.entries = kept
+	}
+	if a.allTime {
+		a.syncLedger()
 	}
 }
 
@@ -225,7 +243,7 @@ func (a *Account) parseLine(line []byte, origin logOrigin, cutoff time.Time) {
 		return
 	}
 	t, err := time.Parse(time.RFC3339Nano, rl.Timestamp)
-	if err != nil || t.Before(cutoff) {
+	if err != nil || (!a.allTime && t.Before(cutoff)) {
 		return
 	}
 	// One response can be logged on several lines (one per content block)
@@ -242,7 +260,6 @@ func (a *Account) parseLine(line []byte, origin logOrigin, cutoff time.Time) {
 	if session == "" {
 		session = origin.session
 	}
-	a.notePath(origin.project, rl.Cwd)
 	e := Entry{T: t, Model: a.intern(rl.Message.Model), In: u.InputTokens, Out: u.OutputTokens, CR: u.CacheRead,
 		Project: a.intern(origin.project), Session: a.intern(session)}
 	if u.CC != nil && (u.CC.E5m+u.CC.E1h) > 0 {
@@ -250,6 +267,13 @@ func (a *Account) parseLine(line []byte, origin logOrigin, cutoff time.Time) {
 	} else {
 		e.CW5 = u.CacheCreation
 	}
+	if a.allTime {
+		a.countAllTime(e)
+		if t.Before(cutoff) {
+			return
+		}
+	}
+	a.notePath(origin.project, rl.Cwd)
 	a.entries = append(a.entries, e)
 }
 

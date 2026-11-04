@@ -1,6 +1,7 @@
 package ccmeter
 
 import (
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -18,8 +19,9 @@ const (
 // Summary as the overview, plus a breakdown of a chosen range of days.
 type AccountDetail struct {
 	Summary
-	Setup AccountSetup `json:"setup"`
-	Range RangeDetail  `json:"range"`
+	AllTime *AllTime     `json:"all_time,omitempty"`
+	Setup   AccountSetup `json:"setup"`
+	Range   RangeDetail  `json:"range"`
 }
 
 // RangeDetail covers the last Days calendar days, including today.
@@ -123,7 +125,14 @@ func rangeDays(s string) int {
 func buildDetail(a *Account, pr *Pricer, now time.Time, days int) AccountDetail {
 	s, es := summarizeEntries(a, pr, now)
 	s.Account = readAccountInfo(s.Dir)
-	return AccountDetail{Summary: s, Setup: readSetup(s.Dir), Range: buildRange(es, a.projectPaths(), pr, now, days)}
+	at, unpriced := a.allTimeUsage(pr)
+	for _, m := range unpriced { // older logs can hold models the last 30 days don't
+		if !slices.Contains(s.Unpriced, m) {
+			s.Unpriced = append(s.Unpriced, m)
+		}
+	}
+	sort.Strings(s.Unpriced)
+	return AccountDetail{Summary: s, AllTime: at, Setup: readSetup(s.Dir), Range: buildRange(es, a.projectPaths(), pr, now, days)}
 }
 
 // buildRange breaks down entries, which must be sorted oldest first. paths maps

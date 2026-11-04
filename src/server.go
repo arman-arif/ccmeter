@@ -60,7 +60,7 @@ func (s *server) applyLocked(cfg Config) {
 			next = append(next, a)
 			delete(old, abs)
 		} else {
-			next = append(next, newAccount(c))
+			next = append(next, newTrackedAccount(c))
 		}
 	}
 	s.cfg, s.accts, s.pr = cfg, next, newPricer(cfg.Pricing)

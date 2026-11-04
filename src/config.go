@@ -31,11 +31,15 @@ func configPath() string {
 	if p := os.Getenv("CCMETER_CONFIG"); p != "" {
 		return expandHome(p)
 	}
+	return filepath.Join(userConfigDir(), "ccmeter", "config.json")
+}
+
+func userConfigDir() string {
 	dir, err := os.UserConfigDir()
 	if err != nil {
-		dir = filepath.Join(homeDir(), ".config")
+		return filepath.Join(homeDir(), ".config")
 	}
-	return filepath.Join(dir, "ccmeter", "config.json")
+	return dir
 }
 
 func homeDir() string {
