@@ -119,15 +119,19 @@ export function BarChart(props: {
 }
 
 // ChartTip floats above a point in its chart and stays inside the chart's width.
+// It's placed straight in the DOM once measured, not through state: its width
+// can depend on where it sits (Firefox snaps text to device pixels), so feeding
+// the measurement back into a render could loop until React gives up.
 export function ChartTip({ x, y, width, children }: { x: number; y: number; width: number; children: ReactNode }) {
   const ref = useRef<HTMLDivElement>(null);
-  const [half, setHalf] = useState(0);
   useLayoutEffect(() => {
-    if (ref.current) setHalf(ref.current.getBoundingClientRect().width / 2);
+    const el = ref.current;
+    if (!el) return;
+    const half = el.offsetWidth / 2;
+    el.style.left = `${Math.max(half, Math.min(x, width - half))}px`;
   });
-  const left = Math.max(half, Math.min(x, width - half));
   return (
-    <div className="tip" ref={ref} role="status" style={{ left, top: y }}>
+    <div className="tip" ref={ref} role="status" style={{ left: x, top: y }}>
       {children}
     </div>
   );
