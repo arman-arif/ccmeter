@@ -459,6 +459,7 @@ export function Account({ name, tick, onEdit }: { name: string; tick: number; on
         <div className="card-head">
           <h2>{a.name}</h2>
           <PlanTag info={a.account} />
+          {a.archived && <span className="tag">Archived</span>}
           <span className="status">{a.last_activity ? 'active ' + ago(a.last_activity) : 'no recent activity'}</span>
           {onEdit && (
             <button className="btn edit" type="button" onClick={() => onEdit(a.name)}>
@@ -469,6 +470,15 @@ export function Account({ name, tick, onEdit }: { name: string; tick: number; on
         </div>
         <EmailLine info={a.account} />
         <DirLine dir={a.dir} />
+        {a.archived && (
+          <div className="hint archived-hint">
+            <Icon name="archive" />
+            <span>
+              Archived: hidden from the overview and left out of the totals, with no background plan-limit checks. Restore it in
+              Accounts.
+            </span>
+          </div>
+        )}
       </div>
 
       {!a.found ? (

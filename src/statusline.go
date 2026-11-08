@@ -110,6 +110,12 @@ func pickAccount(cfg Config, transcript string) AccountConfig {
 		}
 	}
 	if len(cfg.Accounts) > 0 {
+		// Without a better signal, show an account that is actually in use.
+		for _, a := range cfg.Accounts {
+			if !a.Archived {
+				return a
+			}
+		}
 		return cfg.Accounts[0]
 	}
 	return AccountConfig{Name: "default", Dir: filepath.Join(homeDir(), ".claude")}

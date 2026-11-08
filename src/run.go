@@ -38,6 +38,9 @@ Usage:
   ccmeter add NAME DIR [flags]   add an account (any path; --block-limit,
                                  --weekly-limit in USD, --force to replace)
   ccmeter remove NAME|DIR        remove an account
+  ccmeter archive NAME|DIR       hide an account from the table, the dashboard
+                                 and plan-limit checks, keeping its history
+  ccmeter unarchive NAME|DIR     bring an archived account back
 
 Background:
   ccmeter start [serve flags]    run the dashboard in the background
@@ -143,6 +146,16 @@ func Main() {
 		return
 	case "remove", "rm":
 		if err := cmdRemove(cfgPath, rest); err != nil {
+			fail(err)
+		}
+		return
+	case "archive":
+		if err := cmdArchive(cfgPath, rest, true); err != nil {
+			fail(err)
+		}
+		return
+	case "unarchive":
+		if err := cmdArchive(cfgPath, rest, false); err != nil {
 			fail(err)
 		}
 		return

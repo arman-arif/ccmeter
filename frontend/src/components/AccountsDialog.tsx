@@ -110,6 +110,17 @@ export function AccountsDialog(props: {
     setConfirming(null);
   };
 
+  // Archiving keeps the account, its limits and its history; it only takes it
+  // out of the meter until it is restored.
+  const setArchived = async (a: AccountView, archived: boolean) => {
+    setError('');
+    try {
+      onChange(await api<AccountsResponse>('POST', '/api/accounts/archive', { name: a.name, archived }));
+    } catch (err) {
+      setError((err as Error).message);
+    }
+  };
+
   return (
     <dialog
       className="panel"
@@ -135,9 +146,12 @@ export function AccountsDialog(props: {
         </div>
         {list.length === 0 && <div className="cfg-path">No accounts configured.</div>}
         {list.map(a => (
-          <div className="acct-row" key={a.name}>
+          <div className={a.archived ? 'acct-row archived' : 'acct-row'} key={a.name}>
             <div className="acct-main">
-              <div className="acct-name">{a.name}</div>
+              <div className="acct-name">
+                {a.name}
+                {a.archived && <span className="tag">Archived</span>}
+              </div>
               <div className="acct-dir" title={a.dir}>
                 {a.dir}
               </div>
@@ -167,6 +181,15 @@ export function AccountsDialog(props: {
                 <span className="actions">
                   <button className="icon-btn" type="button" aria-label={`Edit ${a.name}`} title="Edit" onClick={() => startEdit(a)}>
                     <Icon name="pencil" />
+                  </button>
+                  <button
+                    className="icon-btn"
+                    type="button"
+                    aria-label={a.archived ? `Restore ${a.name}` : `Archive ${a.name}`}
+                    title={a.archived ? 'Restore' : 'Archive, keeping its history'}
+                    onClick={() => setArchived(a, !a.archived)}
+                  >
+                    <Icon name={a.archived ? 'unarchive' : 'archive'} />
                   </button>
                   <button className="icon-btn danger" type="button" aria-label={`Remove ${a.name}`} title="Remove" onClick={() => setConfirming(a.name)}>
                     <Icon name="trash" />

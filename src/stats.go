@@ -60,6 +60,7 @@ type ModelRow struct {
 type Summary struct {
 	Name         string       `json:"name"`
 	Dir          string       `json:"dir"`
+	Archived     bool         `json:"archived,omitempty"`
 	Found        bool         `json:"found"`
 	Error        string       `json:"error,omitempty"`
 	Files        int          `json:"files"`
@@ -79,7 +80,9 @@ type Summary struct {
 type Report struct {
 	GeneratedAt time.Time `json:"generated_at"`
 	Accounts    []Summary `json:"accounts"`
-	Total       struct {
+	// Archived accounts keep their data but stay out of the totals.
+	Archived []Summary `json:"archived,omitempty"`
+	Total    struct {
 		Today Totals `json:"today"`
 		Week  Totals `json:"week"`
 		Month Totals `json:"month"`
@@ -133,7 +136,7 @@ func summarize(a *Account, pr *Pricer, now time.Time) Summary {
 // summarizeEntries also returns the entries it used, oldest first.
 func summarizeEntries(a *Account, pr *Pricer, now time.Time) (Summary, []Entry) {
 	cfg, es, found, errStr, files := a.snapshot()
-	s := Summary{Name: cfg.Name, Dir: cfg.Dir, Found: found, Error: errStr, Files: files}
+	s := Summary{Name: cfg.Name, Dir: cfg.Dir, Archived: cfg.Archived, Found: found, Error: errStr, Files: files}
 	s.Plan = loadLimits(cfg.Dir, now)
 	if st := readFetchState(cfg.Dir); st.LastError != "" && now.Sub(st.LastAttempt) < 24*time.Hour {
 		s.PlanError = st.LastError
@@ -260,6 +263,10 @@ func buildReport(accts []*Account, pr *Pricer, now time.Time) Report {
 	for _, a := range accts {
 		s := summarize(a, pr, now)
 		s.Account = readAccountInfo(s.Dir)
+		if s.Archived {
+			r.Archived = append(r.Archived, s)
+			continue
+		}
 		addTotals(&r.Total.Today, s.Today.Totals)
 		addTotals(&r.Total.Week, s.Week.Totals)
 		addTotals(&r.Total.Month, s.Month.Totals)

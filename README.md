@@ -37,11 +37,15 @@ ccmeter add work /mnt/data/claude-work --block-limit 40 --weekly-limit 600
 ccmeter add client ./clients/acme/.claude      # relative paths are made absolute
 ccmeter add work /new/path --force             # replace an existing account
 ccmeter remove client                          # by name or by dir
+ccmeter archive client                         # keep it, hide it from the meter
+ccmeter unarchive client                       # bring it back
 ```
 
 The first `add` or `remove` creates the config file and keeps any auto-detected accounts in it.
 
-You can do the same from the dashboard: the **Accounts** button (or the pencil on a card) opens a panel to add, edit, rename or remove accounts and set their limits. Changes are saved to the same config file. A running dashboard also picks up edits made with the CLI or by hand within one rescan.
+`archive` is the gentler version of `remove`: the account keeps its config, its limits and its history, but it leaves the table, the dashboard's tabs and totals, and the background plan-limit checks. Its logs are still read, so its usage and all-time totals stay accurate, and `unarchive` puts it back exactly as it was. Use it for an account you've stopped using but don't want to forget.
+
+You can do the same from the dashboard: the **Accounts** button (or the pencil on a card) opens a panel to add, edit, rename, archive, restore or remove accounts and set their limits. Changes are saved to the same config file. A running dashboard also picks up edits made with the CLI or by hand within one rescan. Archived accounts are tagged in that panel, and the overview keeps them behind a **Show N archived accounts** toggle at the bottom, out of the totals.
 
 Editing in the dashboard only works from the machine running it (loopback requests from the dashboard's own page). Start it with `ccmeter serve -read-only` to turn editing off entirely. To block DNS-rebinding attacks from websites, the dashboard only answers requests addressed to an IP address, `localhost` or this machine's name. If you reach it under another name, start it with `-addr thatname:7878`.
 
@@ -51,7 +55,8 @@ Without a config file, ccmeter looks in `$CLAUDE_CONFIG_DIR` (comma separated), 
 {
   "accounts": [
     { "name": "personal", "dir": "~/.claude" },
-    { "name": "work",     "dir": "~/.claude-work", "block_limit_usd": 40, "weekly_limit_usd": 600 }
+    { "name": "work",     "dir": "~/.claude-work", "block_limit_usd": 40, "weekly_limit_usd": 600 },
+    { "name": "old-work", "dir": "~/.claude-old", "archived": true }
   ],
   "pricing": {
     "claude-example": { "input": 10, "output": 50 }
@@ -62,6 +67,7 @@ Without a config file, ccmeter looks in `$CLAUDE_CONFIG_DIR` (comma separated), 
 The price above is an example. Use it for any model the meter reports as unpriced, or to change a built-in price.
 
 - `block_limit_usd` / `weekly_limit_usd` (optional): your limits, measured in equivalent API cost. Find them by watching where Claude Code stops you. If you don't set `block_limit_usd`, the 5-hour % is measured against your own busiest window in the last 30 days.
+- `archived` (optional): keeps the account out of the table, the dashboard's tabs and totals, and scheduled plan-limit checks. `ccmeter archive NAME` and `ccmeter unarchive NAME` set it for you.
 - `pricing` (optional): USD per million tokens, matched against model names by substring (the longest match wins). Cache prices default to 1.25x input for 5-minute writes, 2x for 1-hour writes and 0.1x for reads. Built-in prices cover the Fable, Opus, Sonnet and Haiku families, and the dashboard's Prices page lists them with the date they were last checked.
 
 To run Claude Code against a second account: `CLAUDE_CONFIG_DIR=~/.claude-work claude` (log in once there).
@@ -115,7 +121,7 @@ ccmeter checks your real 5-hour and weekly limits on its own, along with any sep
 - **`ccmeter`** (the table) and `ccmeter json` refresh any account whose last check is more than 5 minutes old before printing (`-no-refresh` to skip).
 - **The hook or plugin** (below) also checks right after you use an account, from any Claude Code surface.
 
-All three share one throttle and lock per account, so they never check the same account twice in a row.
+All three share one throttle and lock per account, so they never check the same account twice in a row. Archived accounts are skipped by the dashboard's schedule and by the stale-limit refresh in `ccmeter` and `ccmeter json`, since a dormant account's limits don't matter.
 
 ### Real plan limits from any Claude Code surface (hook)
 

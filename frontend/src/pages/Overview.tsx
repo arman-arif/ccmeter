@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import type { Report, Summary } from '../api';
 import { BarChart } from '../components/BarChart';
 import { DirLine, EmailLine, PeriodStat, PlanTag, Tile } from '../components/Stats';
@@ -17,9 +18,11 @@ function EditButton({ name, onEdit }: { name: string; onEdit?: (name: string) =>
 }
 
 function AccountCard({ a, onEdit }: { a: Summary; onEdit?: (name: string) => void }) {
+  const card = a.archived ? 'card archived' : 'card';
   const title = (
     <h2>
       <Link href={accountPath(a.name)}>{a.name}</Link>
+      {a.archived && <span className="tag">Archived</span>}
     </h2>
   );
   const details = (
@@ -30,7 +33,7 @@ function AccountCard({ a, onEdit }: { a: Summary; onEdit?: (name: string) => voi
   );
   if (!a.found) {
     return (
-      <article className="card">
+      <article className={card}>
         <div className="card-head">
           {title}
           <PlanTag info={a.account} />
@@ -50,7 +53,7 @@ function AccountCard({ a, onEdit }: { a: Summary; onEdit?: (name: string) => voi
   }
   const daily = a.daily ?? [];
   return (
-    <article className="card">
+    <article className={card}>
       <div className="card-head">
         {title}
         <PlanTag info={a.account} />
@@ -116,9 +119,11 @@ function AccountCard({ a, onEdit }: { a: Summary; onEdit?: (name: string) => voi
 
 export function Overview(props: { report?: Report; onEdit?: (name: string) => void; onAdd: () => void }) {
   const { report, onEdit, onAdd } = props;
+  const [showArchived, setShowArchived] = useState(false);
   useTitle('Claude Code Usage Meter');
   if (!report) return null;
   const accounts = report.accounts ?? [];
+  const archived = report.archived ?? [];
   return (
     <>
       {accounts.length > 0 && (
@@ -134,20 +139,36 @@ export function Overview(props: { report?: Report; onEdit?: (name: string) => vo
         ))}
         {accounts.length === 0 && (
           <div className="empty">
-            No accounts yet.
+            {archived.length > 0 ? 'No active accounts: every account is archived.' : 'No accounts yet.'}
             <br />
             <br />
             <button className="btn primary" type="button" onClick={onAdd}>
               <Icon name="plus" />
-              Add an account
+              {archived.length > 0 ? 'Manage accounts' : 'Add an account'}
             </button>
           </div>
         )}
       </section>
+      {archived.length > 0 && (
+        <section className="archived-section">
+          <button className="link-btn archived-toggle" type="button" aria-expanded={showArchived} onClick={() => setShowArchived(v => !v)}>
+            <Icon name="archive" />
+            {showArchived ? 'Hide' : 'Show'} {archived.length} archived account{archived.length === 1 ? '' : 's'}
+            <Icon name="chevron" className="chev" />
+          </button>
+          {showArchived && (
+            <div className="grid archived-grid">
+              {archived.map(a => (
+                <AccountCard key={a.name} a={a} onEdit={onEdit} />
+              ))}
+            </div>
+          )}
+        </section>
+      )}
       <footer>
         Costs are estimates at <Link href="/prices">API list prices</Link>, read from each config dir's <code>projects/*.jsonl</code> logs. The 5-hour
         percentage is against <code>block_limit_usd</code> when set, otherwise against your own busiest window in the last 30
-        days.
+        days. Archived accounts are kept but left out of the tabs and these totals.
       </footer>
     </>
   );

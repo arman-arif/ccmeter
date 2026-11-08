@@ -302,3 +302,16 @@ table.mix td { border-bottom: 0; padding: 7px 6px; white-space: nowrap; }
 .dir.email-line { margin-bottom: 2px; }
 .capitalize { text-transform: capitalize; }
 .card-head .tag { margin-left: 0; align-self: center; white-space: nowrap; }
+
+/* Archived accounts are kept, but out of the way: the overview keeps them in
+   a collapsed section, and the panel marks them. */
+.archived-section { margin-top: 20px; }
+.archived-toggle { font-size: 13px; font-weight: 500; }
+.archived-toggle .chev { width: 13px; height: 13px; transition: transform .15s; }
+.archived-toggle[aria-expanded="true"] .chev { transform: rotate(90deg); }
+.archived-grid { margin-top: 12px; }
+.card.archived { opacity: .75; }
+.card.archived:hover { opacity: 1; }
+.acct-row.archived .acct-name { color: var(--text-secondary); }
+.archived-hint { margin: -6px 0 14px; }
+.card-head .tag + .status { margin-left: 2px; }

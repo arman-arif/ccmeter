@@ -102,6 +102,9 @@ func upsertAccount(cfg *Config, acct AccountConfig, original string, replace boo
 		}
 	}
 	if target >= 0 {
+		// Editing an account (including a rename) keeps whether it is archived;
+		// archiving is its own action, so a save doesn't quietly restore it.
+		acct.Archived = cfg.Accounts[target].Archived
 		cfg.Accounts[target] = acct
 		return true, nil
 	}
@@ -109,29 +112,42 @@ func upsertAccount(cfg *Config, acct AccountConfig, original string, replace boo
 	return false, nil
 }
 
-// removeAccount deletes the account matching key by name, then by dir.
-func removeAccount(cfg *Config, key string) (AccountConfig, error) {
-	idx := -1
+// findAccount locates the account matching key by name, then by dir.
+func findAccount(cfg *Config, key string) int {
 	for i, a := range cfg.Accounts {
 		if a.Name == key {
-			idx = i
-			break
+			return i
 		}
 	}
-	if idx < 0 {
-		for i, a := range cfg.Accounts {
-			if sameDir(a.Dir, key) {
-				idx = i
-				break
-			}
+	for i, a := range cfg.Accounts {
+		if sameDir(a.Dir, key) {
+			return i
 		}
 	}
+	return -1
+}
+
+// removeAccount deletes the account matching key by name, then by dir.
+func removeAccount(cfg *Config, key string) (AccountConfig, error) {
+	idx := findAccount(cfg, key)
 	if idx < 0 {
 		return AccountConfig{}, fmt.Errorf("no account named or located at %q", key)
 	}
 	removed := cfg.Accounts[idx]
 	cfg.Accounts = append(cfg.Accounts[:idx], cfg.Accounts[idx+1:]...)
 	return removed, nil
+}
+
+// setArchived archives or restores the account matching key by name, then by
+// dir. An archived account keeps its config and history; it is only left out
+// of the table, the dashboard and background plan-limit checks.
+func setArchived(cfg *Config, key string, archived bool) (AccountConfig, error) {
+	idx := findAccount(cfg, key)
+	if idx < 0 {
+		return AccountConfig{}, fmt.Errorf("no account named or located at %q", key)
+	}
+	cfg.Accounts[idx].Archived = archived
+	return cfg.Accounts[idx], nil
 }
 
 // cmdAdd: ccmeter add <name> <dir> [--block-limit USD] [--weekly-limit USD] [--force]
@@ -207,6 +223,38 @@ func cmdRemove(cfgPath string, args []string) error {
 	fmt.Printf("removed %s (%s)\n", removed.Name, removed.Dir)
 	if !fromFile {
 		fmt.Printf("created %s so the removal sticks; auto-detection is off while it exists\n", cfgPath)
+	}
+	return nil
+}
+
+// cmdArchive: ccmeter archive <name|dir>
+// ccmeter unarchive: ccmeter unarchive <name|dir>
+func cmdArchive(cfgPath string, args []string, archived bool) error {
+	cmd, done := "archive", "archived"
+	if !archived {
+		cmd, done = "unarchive", "restored"
+	}
+	if len(args) != 1 {
+		fmt.Fprintf(os.Stderr, "usage: ccmeter %s <name|dir>\n", cmd)
+		os.Exit(2)
+	}
+	cfg, fromFile, err := loadConfig(cfgPath)
+	if err != nil {
+		return err
+	}
+	a, err := setArchived(&cfg, args[0], archived)
+	if err != nil {
+		return fmt.Errorf("%v (see `ccmeter accounts`)", err)
+	}
+	if err := saveConfig(cfgPath, cfg); err != nil {
+		return err
+	}
+	fmt.Printf("%s %s (%s)\n", done, a.Name, a.Dir)
+	switch {
+	case archived:
+		fmt.Println("an archived account keeps its config and history, but it is left out of the table, the dashboard and background plan-limit checks")
+	case !fromFile:
+		fmt.Printf("created %s so the change sticks; auto-detection is off while it exists\n", cfgPath)
 	}
 	return nil
 }

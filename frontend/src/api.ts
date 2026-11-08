@@ -70,6 +70,7 @@ export interface AccountInfo {
 export interface Summary {
   name: string;
   dir: string;
+  archived?: boolean;
   found: boolean;
   error?: string;
   files: number;
@@ -89,6 +90,7 @@ export interface Summary {
 export interface Report {
   generated_at: string;
   accounts: Summary[] | null;
+  archived?: Summary[] | null;
   total: { today: Totals; week: Totals; month: Totals };
 }
 
@@ -97,6 +99,7 @@ export interface AccountView {
   dir: string;
   block_limit_usd?: number;
   weekly_limit_usd?: number;
+  archived?: boolean;
   has_projects: boolean;
 }
 

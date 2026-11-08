@@ -256,6 +256,10 @@ func printTable(w io.Writer, r Report, verbose, none bool) {
 		fmt.Fprintln(w, "No Claude Code config dirs found. Run `ccmeter init` and edit the file, or set CLAUDE_CONFIG_DIR.")
 		return
 	}
+	if len(r.Accounts) == 0 {
+		fmt.Fprintln(w, "Every account is archived ("+accountNames(r.Archived)+"). Run `ccmeter unarchive NAME`, or use the dashboard's Accounts panel, to bring one back.")
+		return
+	}
 	now := r.GeneratedAt
 
 	limits := table{header: []string{"LIMITS", "5-HOUR WINDOW", "WEEK"}}
@@ -352,6 +356,18 @@ func printTable(w io.Writer, r Report, verbose, none bool) {
 	if len(seen) == 0 {
 		fmt.Fprintln(w, "Run `ccmeter hook install` (or `ccmeter statusline install`) to also show your real plan limits.")
 	}
+	if n := len(r.Archived); n > 0 {
+		fmt.Fprintln(w, paint(styleDim, fmt.Sprintf("%d archived account(s) not shown: %s", n, accountNames(r.Archived))))
+	}
+}
+
+// accountNames joins archived account names for a one-line note.
+func accountNames(ss []Summary) string {
+	names := make([]string, len(ss))
+	for i, s := range ss {
+		names[i] = s.Name
+	}
+	return strings.Join(names, ", ")
 }
 
 // printLimits renders fetched plan limits. plans and errs are parallel to
@@ -419,6 +435,9 @@ func printAccounts(w io.Writer, cfg Config, cfgPath string, fromFile bool) {
 	t := table{header: []string{"ACCOUNT", "DIR", "NOTES"}}
 	for _, a := range cfg.Accounts {
 		var notes []string
+		if a.Archived {
+			notes = append(notes, paint(styleDim, "archived"))
+		}
 		if info := readAccountInfo(a.Dir); info != nil && info.Plan != "" {
 			notes = append(notes, info.Plan)
 		}

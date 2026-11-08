@@ -49,6 +49,7 @@ make install              # copies build/bin/ccmeter to /usr/local/bin, never bu
 | `ccmeter hook-fetch DIR` | Internal: the detached child that does the check. |
 | `ccmeter limits [NAME...]` | Checks plan limits now and prints them. |
 | `ccmeter init / accounts / add NAME DIR / remove NAME\|DIR` | Account management. `add` accepts `--block-limit`, `--weekly-limit` (USD) and `--force`. |
+| `ccmeter archive / unarchive NAME\|DIR` | Hides an account from the table, the dashboard and plan-limit checks while keeping its config and history (the `archived` flag in the config). |
 
 Global flags: `-config PATH` (default `$CCMETER_CONFIG`, else `<user config dir>/ccmeter/config.json`); `--color` / `--no-color` (default: color on a terminal, off when piped, with `NO_COLOR` or `TERM=dumb`).
 
@@ -61,12 +62,12 @@ Global flags: `-config PATH` (default `$CCMETER_CONFIG`, else `<user config dir>
 | `src/version.go` | The `version` constant (the Makefile scrapes it for `make bundle`). |
 | `src/ui.go` | Terminal output: color detection, `table` (aligns cells that contain color codes, which text/tabwriter can't), usage meters, `printTable`, `printLimits`, `printAccounts`. Tables stay within 80 columns. Color is decoration only: alerts are also in words, so piped output and `NO_COLOR` lose nothing. Near-limit thresholds match the dashboard (80%, 100%). |
 | `src/term_unix.go` / `src/term_windows.go` | `enableTerminalColor` (turns on ANSI in the Windows console, plain text where unsupported). |
-| `src/config.go` | `Config`/`AccountConfig` (name, dir, `block_limit_usd`, `weekly_limit_usd`, `pricing` overrides), config path, auto-detection, `init`. |
-| `src/accounts.go` | Shared rules for adding, updating and removing accounts (`upsertAccount`, `removeAccount`, used by the CLI and the web API). `saveConfig` writes atomically. |
+| `src/config.go` | `Config`/`AccountConfig` (name, dir, `block_limit_usd`, `weekly_limit_usd`, `archived`, `pricing` overrides), config path, auto-detection, `init`. |
+| `src/accounts.go` | Shared rules for adding, updating, archiving and removing accounts (`upsertAccount`, `setArchived`, `removeAccount`, used by the CLI and the web API). Editing an account keeps its `archived` flag. `saveConfig` writes atomically. |
 | `src/pricing.go` | `builtinPrices`, the API list prices as ordered rules: versions first (`isModelVersion`, so `sonnet-5` doesn't match `sonnet-5-5`), then a fallback per family at its newest price. Mostly cache write is 1.25x input (5-minute) or 2x (1-hour) and cache read 0.1x, but rates differ by model (Opus 5.5 and Sonnet 5.5 read at 0.05x, Fable 5.1 at 0.025x), and Haiku 5.5 charges more for prompts over 100K tokens. When changing the table, re-check it against `pricesSourceURL`, then update `pricesCheckedOn` and `pricing_test.go`. Models of no known family, and Mythos Preview, are reported as "unpriced", and the user adds them under `pricing`. |
 | `src/scan.go` | Incremental JSONL scanner over `<dir>/projects/**/*.jsonl`. It keeps a byte offset per file, resumes after partial lines, dedupes by `message.id:requestId`, skips `<synthetic>`, and keeps 31 days in memory (`src/alltime.go` handles anything older). Each entry records its project (the log folder under `projects/`, not `cwd`, which follows every `cd`) and session; `paths` maps a folder to its real path, using the `cwd` that encodes to the folder's name. |
 | `src/alltime.go` | The all-time ledger for the account page. Claude Code deletes logs after 30 days by default, so the dashboard's accounts (`newTrackedAccount`) read every log and save token totals per UTC day, model and long-prompt flag. On each scan the side with more responses wins per bucket, so re-reading logs after a restart counts nothing twice. It stores tokens, not costs, so prices apply at read time. The status line and table use plain accounts and don't touch it. |
-| `src/stats.go` | `summarize` builds the `Summary` for each account: the 5-hour block (starts at the hour of the first message, ends 5h later or after a 5h gap), burn rate, projection, % of the configured limit or of the 30-day peak block, today / rolling 7d / 30d, daily series, models, `Plan` (real limits) and `PlanError`. |
+| `src/stats.go` | `summarize` builds the `Summary` for each account: the 5-hour block (starts at the hour of the first message, ends 5h later or after a 5h gap), burn rate, projection, % of the configured limit or of the 30-day peak block, today / rolling 7d / 30d, daily series, models, `Plan` (real limits) and `PlanError`. `buildReport` puts active accounts in `Report.Accounts` and their totals, and archived ones in `Report.Archived`, which the dashboard shows separately. |
 | `src/detail.go` | `buildDetail` for the account page: the `Summary`, a `RangeDetail` for the last N calendar days (daily, models, projects, sessions, 5-hour windows, weekday/hour cells) and `AccountSetup` (hooks, plugin and status line yes/no from `settings.json`, plus the fetch state). |
 | `src/prices.go` | `buildPrices` for the Prices page: the models in the logs with the price each resolved to, the user's overrides and the built-in list. |
 | `src/accountinfo.go` | `readAccountInfo`: plan, email, name, organization and dates from the `oauthAccount` profile in `.claude.json` (for the default `~/.claude`, the file beside the folder, `~/.claude.json`, comes first). Only named fields are decoded, so no other part of that file can reach the API, and `.credentials.json` is never read for this. Filled in by `buildReport` and `buildDetail`, not `summarize`, because the status line must stay quick. |
@@ -88,7 +89,7 @@ Global flags: `-config PATH` (default `$CCMETER_CONFIG`, else `<user config dir>
 ### HTTP API (`src/server.go`)
 - `GET /api/summary`: the `Report` (all accounts and totals).
 - `GET /api/health`: `{pid, version, addr, config, started}`, used by start/stop/status.
-- `GET /api/accounts`, `POST /api/accounts` (add, or edit via `original`), `DELETE /api/accounts?name=`.
+- `GET /api/accounts`, `POST /api/accounts` (add, or edit via `original`), `DELETE /api/accounts?name=`, `POST /api/accounts/archive` (`{name, archived}`; the dashboard's archive and restore action).
 - `GET /api/accounts/{name}?days=N`: `AccountDetail` for the account page (N is 1 to 30, default 30).
 - `GET /api/prices`: `PricesReport` for the Prices page.
 - Everything else: `webHandler` serves `/assets/*` with immutable caching and answers any other page path with `index.html` (no-cache), so browser routes survive a reload. Unknown `/api/` paths get a JSON 404.
@@ -173,6 +174,7 @@ Dollar figures are estimates from local logs. The real plan percentages come fro
 10. Prices page (`/prices`), and the built-in prices brought up to date with the Claude 5 family: they had been charging newer models at older, higher prices.
 11. Separate weekly limits per model (Fable on Max), and an account section with plan, email and organization on each account.
 12. An all-time tile on the account page, backed by a saved ledger because Claude Code deletes old logs.
+13. Archiving: `ccmeter archive` / `unarchive`, the `archived` config flag, an archive/restore action in the Accounts panel, an Archived tag, and a collapsed archived section on the overview. Archived accounts keep their config, logs and all-time ledger, but leave the totals, tabs and plan-limit schedule.
 
 ## Open items and ideas
 
@@ -182,4 +184,5 @@ Dollar figures are estimates from local logs. The real plan percentages come fro
 - **Not yet verified on real machines:** macOS Keychain naming for non-default dirs in the opt-in endpoint, the Windows plugin hook (runs via `sh`), systemd/launchd autostart (only the renderers are unit-tested; the Linux desktop-entry path was run for real), and real `claude -p /usage` from the background service's PATH.
 - **Idea:** a small VS Code extension showing `5h % · wk %` per account in the VS Code status bar, reading `/api/summary`.
 - **Idea:** a dashboard button to run `hook install` / `statusline install` per account.
+- Archived accounts are still scanned (so the all-time ledger stays right) but skipped by the limit scheduler and by the stale-limit refresh; `ccmeter limits` still checks them when named. The dashboard lists them behind a toggle on the overview and tags them in the Accounts panel and on their page.
 - The 7-day tile is rolling (exact 168 hours, matching the weekly limit) while the 7-day filter is 7 whole calendar days, so they can differ. The filter row prints its dates to make that clear.

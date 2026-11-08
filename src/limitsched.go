@@ -37,6 +37,15 @@ func (a *Account) foundDir() (string, bool) {
 	return a.Cfg.Dir, a.found
 }
 
+// archived reports whether the account is archived, which keeps it out of
+// scheduled plan-limit checks: its config and history are kept, but it is
+// treated as dormant.
+func (a *Account) archived() bool {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return a.Cfg.Archived
+}
+
 // limitsDue decides whether a scheduled check should run for an account now.
 func limitsDue(st fetchState, lastActive time.Time, interval time.Duration, now time.Time) bool {
 	if now.Before(st.NextAllowed) {
@@ -124,6 +133,9 @@ func (ls *limitsScheduler) pass(force bool) {
 
 	accts, _ := ls.srv.current()
 	for _, a := range accts {
+		if a.archived() {
+			continue
+		}
 		dir, found := a.foundDir()
 		if !found {
 			continue
@@ -150,7 +162,7 @@ func refreshDueLimits(accts []*Account) {
 	now := time.Now()
 	for _, a := range accts {
 		dir, found := a.foundDir()
-		if !found || !fetchDue(dir, now) {
+		if !found || a.archived() || !fetchDue(dir, now) {
 			continue
 		}
 		wg.Add(1)

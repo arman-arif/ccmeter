@@ -136,7 +136,10 @@ func serve(cfg Config, cfgPath string, pr *Pricer, addr string, every time.Durat
 	mux.HandleFunc("GET /api/accounts/{name}", s.handleDetail)
 	mux.HandleFunc("GET /api/prices", func(w http.ResponseWriter, r *http.Request) {
 		accts, pr := s.current()
-		writeJSON(w, http.StatusOK, buildPrices(buildReport(accts, pr, time.Now()).Accounts, pr, s.cfgPath))
+		rep := buildReport(accts, pr, time.Now())
+		// Archived accounts are hidden from the meter, but their models still
+		// belong on the Prices page.
+		writeJSON(w, http.StatusOK, buildPrices(append(rep.Accounts, rep.Archived...), pr, s.cfgPath))
 	})
 	mux.HandleFunc("POST /api/limits/refresh", func(w http.ResponseWriter, r *http.Request) {
 		if err := s.sameMachine(r); err != nil {
@@ -150,6 +153,7 @@ func serve(cfg Config, cfgPath string, pr *Pricer, addr string, every time.Durat
 	})
 	mux.HandleFunc("POST /api/accounts", s.handleSave)
 	mux.HandleFunc("DELETE /api/accounts", s.handleDelete)
+	mux.HandleFunc("POST /api/accounts/archive", s.handleArchive)
 
 	limitsNote := "plan limits every " + limitsEvery.String() + " (idle accounts every " + idleLimitsInterval.String() + ")"
 	if limitsEvery <= 0 {
@@ -306,6 +310,41 @@ func (s *server) handleSave(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	go s.scan()
+	writeJSON(w, http.StatusOK, s.accountList(r))
+}
+
+type archiveRequest struct {
+	Name     string `json:"name"`
+	Archived bool   `json:"archived"`
+}
+
+// handleArchive hides an account from the meter, or brings it back, without
+// removing it from the config.
+func (s *server) handleArchive(w http.ResponseWriter, r *http.Request) {
+	if err := s.canEdit(r); err != nil {
+		writeErr(w, http.StatusForbidden, err)
+		return
+	}
+	if mt, _, _ := mime.ParseMediaType(r.Header.Get("Content-Type")); mt != "application/json" {
+		writeErr(w, http.StatusUnsupportedMediaType, errors.New("expected application/json"))
+		return
+	}
+	var req archiveRequest
+	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 64<<10)).Decode(&req); err != nil {
+		writeErr(w, http.StatusBadRequest, fmt.Errorf("bad request: %v", err))
+		return
+	}
+	if req.Name == "" {
+		writeErr(w, http.StatusBadRequest, errors.New("missing name"))
+		return
+	}
+	if err := s.mutate(func(c *Config) error {
+		_, err := setArchived(c, req.Name, req.Archived)
+		return err
+	}); err != nil {
+		writeErr(w, http.StatusBadRequest, err)
+		return
+	}
 	writeJSON(w, http.StatusOK, s.accountList(r))
 }
 

@@ -18,6 +18,9 @@ type AccountConfig struct {
 	// falls back to your own 30-day peak for the 5-hour window.
 	BlockLimitUSD  float64 `json:"block_limit_usd,omitempty"`
 	WeeklyLimitUSD float64 `json:"weekly_limit_usd,omitempty"`
+	// Archived keeps the account and its history but leaves it out of the
+	// table, the dashboard and background plan-limit checks.
+	Archived bool `json:"archived,omitempty"`
 }
 
 // Config is the whole ccmeter config file.
