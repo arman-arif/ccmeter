@@ -64,6 +64,13 @@ header h1 .icon { width: 20px; height: 20px; color: var(--series-1); }
        border-radius: 8px; height: 32px; padding: 0 10px; display: inline-flex; align-items: center;
        gap: 6px; cursor: pointer; font: inherit; font-size: 13px; }
 .btn:hover { color: var(--text-primary); }
+.btn:disabled { cursor: progress; opacity: .75; }
+.btn:disabled:hover { color: var(--text-secondary); }
+
+/* The refresh control spins while plan limits are being checked. */
+.refresh-btn .icon.spin { animation: spin .9s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .refresh-btn .icon.spin { animation: none; } }
 
 .totals { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 20px; }
 .tile { background: var(--surface-1); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; }

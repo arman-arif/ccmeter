@@ -116,8 +116,15 @@ export function App() {
             </>
           )}
         </span>
-        <button className="btn" type="button" aria-label="Refresh now" onClick={refresh}>
-          <Icon name="refresh" />
+        <button
+          className="btn refresh-btn"
+          type="button"
+          aria-label="Refresh now"
+          aria-busy={checking}
+          disabled={checking}
+          onClick={refresh}
+        >
+          <Icon name="refresh" className={checking ? 'spin' : ''} />
         </button>
         <button className="btn" type="button" onClick={() => openAccounts()}>
           <Icon name="users" />
